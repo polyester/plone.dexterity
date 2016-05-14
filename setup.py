@@ -37,7 +37,6 @@ setup(
     zip_safe=False,
     install_requires=[
         'setuptools',
-        'plone.alterego',
         'plone.behavior>=1.0b5',
         'plone.supermodel>=1.0b2',
         'plone.synchronize',
@@ -47,7 +46,6 @@ setup(
         'zope.component',
         'zope.container',
         'zope.dottedname',
-        'zope.filerepresentation>=3.6.0',
         'zope.interface',
         'zope.lifecycleevent',
         'zope.location',
@@ -55,24 +53,9 @@ setup(
         'zope.schema',
         'zope.security',
         'zope.size',
-    ] + ([
         'zope.dublincore',
         'ZODB',
-    ] if sys.version_info[:2] > (2, 7) else []) + ([
-        # 'Acquisition',
-        # 'AccessControl',
-        'DateTime>=4.0.1',
-        'plone.autoform>=1.0b2',
-        'plone.folder',
-        'plone.memoize',
-        'plone.rfc822',
-        'plone.z3cform>=0.6.0',
-        'Products.CMFCore',
-        'Products.CMFDynamicViewFTI',
-        'Products.statusmessages',
-        'ZODB3',
-        'Zope2',
-    ] if sys.version_info[:2] < (3, 0) else []),
+    ],
     extras_require={
         'test': [
             'plone.mocktestcase>=1.0b3',
