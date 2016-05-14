@@ -1,35 +1,12 @@
 # -*- coding: utf-8 -*-
-try:
-    from AccessControl import ClassSecurityInfo
-    from AccessControl import Permissions as acpermissions
-    from AccessControl import getSecurityManager
-    from Acquisition import Explicit
-    from Acquisition import aq_base
-    from Acquisition import aq_parent
-    from DateTime import DateTime
-    from OFS.PropertyManager import PropertyManager
-    from OFS.SimpleItem import SimpleItem
-    from Products.CMFCore import permissions
-    from Products.CMFCore.CMFCatalogAware import CMFCatalogAware
-    from Products.CMFCore.PortalContent import PortalContent
-    from Products.CMFCore.PortalFolder import PortalFolderBase
-    from Products.CMFCore.interfaces import ICatalogableDublinCore
-    from Products.CMFCore.interfaces import IDublinCore
-    from Products.CMFCore.interfaces import IMutableDublinCore
-    from Products.CMFCore.interfaces import ITypeInformation
-    from Products.CMFDynamicViewFTI.browserdefault import BrowserDefaultMixin
-    from Products.CMFPlone.interfaces import IConstrainTypes
-    from zExceptions import Unauthorized
-    from plone.folder.ordered import CMFOrderedBTreeFolderBase
-    from plone.autoform.interfaces import READ_PERMISSIONS_KEY
-    from plone.dexterity.filerepresentation import DAVCollectionMixin
-    from plone.dexterity.filerepresentation import DAVResourceMixin
-    HAS_CMF = True
-except ImportError:
-    HAS_CMF = False
-
 from copy import deepcopy
+from datetime import datetime
+from dateutil.tz import tzlocal
+from persistent import Persistent
 from plone.behavior.interfaces import IBehaviorAssignable
+from zope.container.contained import Contained
+from zope.container.ordered import OrderedContainer
+from zope.dublincore.interfaces import ICMFDublinCore, IWriteZopeDublinCore
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.interfaces import IDexterityItem
@@ -43,19 +20,18 @@ from plone.uuid.interfaces import IAttributeUUID
 from plone.uuid.interfaces import IUUID
 from zope.annotation import IAttributeAnnotatable
 from zope.component import queryUtility
-from zope.container.contained import Contained
-from zope.interface import implementer
-from zope.interface.declarations import Implements
-from zope.interface.declarations import ObjectSpecificationDescriptor
 from zope.interface.declarations import getObjectSpecification
 from zope.interface.declarations import implementedBy
+from zope.interface.declarations import Implements
+from zope.interface.declarations import ObjectSpecificationDescriptor
+from zope.interface import implementer
 from zope.schema.interfaces import IContextAwareDefaultFactory
 from zope.security.interfaces import IPermission
 
 _marker = object()
-_zone = DateTime().timezone()
-FLOOR_DATE = DateTime(1970, 0)  # always effective
-CEILING_DATE = DateTime(2500, 0)  # never expires
+_zone = tzlocal()
+FLOOR_DATE = datetime(1970, 1, 1)  # always effective
+CEILING_DATE = datetime(2500, 1, 1)  # never expires
 
 
 def _default_from_schema(context, schema, fieldname):
@@ -157,7 +133,7 @@ class FTIAwareSpecification(ObjectSpecificationDescriptor):
         return all_spec
 
 
-class AttributeValidator(Explicit):
+class AttributeValidator(object):
     """Decide whether attributes should be accessible. This is set as the
     __allow_access_to_unprotected_subobjects__ variable in Dexterity's content
     classes.
@@ -244,19 +220,14 @@ class PasteBehaviourMixin(object):
     IDexterityContent,
     IAttributeAnnotatable,
     IAttributeUUID,
-    IDublinCore,
-    ICatalogableDublinCore,
-    IMutableDublinCore
+    IWriteZopeDublinCore,
 )
-class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
-                       Contained):
+class DexterityContent(Persistent, Contained):
     """Base class for Dexterity content
     """
 
     __providedBy__ = FTIAwareSpecification()
     __allow_access_to_unprotected_subobjects__ = AttributeValidator()
-
-    security = ClassSecurityInfo()
 
     # portal_type is set by the add view and/or factory
     portal_type = None
@@ -281,7 +252,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
 
         if id is not None:
             self.id = id
-        now = DateTime()
+        now = datetime.utcnow()
         self.creation_date = now
         self.modification_date = now
 
@@ -349,10 +320,10 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
     # that can't be encoded to ASCII will throw a UnicodeEncodeError
 
     def _get__name__(self):
-        return unicode(self.id)
+        return self.id
 
     def _set__name__(self, value):
-        if isinstance(value, unicode):
+        if isinstance(value, str):
             value = str(value)  # may throw, but that's OK - id must be ASCII
         self.id = value
 
@@ -362,7 +333,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         """Returns the item's globally unique id."""
         return IUUID(self)
 
-    @security.private
+    # @security.private
     def notifyModified(self):
         """Update creators and modification_date.
 
@@ -371,7 +342,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         self.addCreator()
         self.setModificationDate()
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def addCreator(self, creator=None):
         """ Add creator to Dublin Core creators.
         """
@@ -387,7 +358,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         if creator and creator not in self.listCreators():
             self.creators = self.creators + (creator, )
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setModificationDate(self, modification_date=None):
         """ Set the date when the resource was last modified.
 
@@ -400,63 +371,63 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
 
     # IMinimalDublinCore
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Title(self):
         # this is a CMF accessor, so should return utf8-encoded
-        if isinstance(self.title, unicode):
+        if isinstance(self.title, str):
             return self.title.encode('utf-8')
         return self.title or ''
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Description(self):
         # this is a CMF accessor, so should return utf8-encoded
-        if isinstance(self.description, unicode):
+        if isinstance(self.description, str):
             return self.description.encode('utf-8')
         return self.description or ''
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Type(self):
         ti = self.getTypeInfo()
         return ti is not None and ti.Title() or 'Unknown'
 
     # IDublinCore
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def listCreators(self):
         # List Dublin Core Creator elements - resource authors.
         if self.creators is None:
             return ()
         return tuple(safe_utf8(c) for c in self.creators)
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Creator(self):
         # Dublin Core Creator element - resource author.
         creators = self.listCreators()
         return creators and creators[0] or ''
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Subject(self):
         # Dublin Core Subject element - resource keywords.
         if self.subject is None:
             return ()
         return tuple(safe_utf8(s) for s in self.subject)
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Publisher(self):
         # Dublin Core Publisher element - resource publisher.
         return 'No publisher'
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def listContributors(self):
         # Dublin Core Contributor elements - resource collaborators.
         return tuple(safe_utf8(c) for c in self.contributors)
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Contributors(self):
         # Deprecated alias of listContributors.
         return self.listContributors()
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Date(self, zone=None):
         # Dublin Core Date element - default date.
         if zone is None:
@@ -469,7 +440,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         date = datify(date)
         return date.toZone(zone).ISO()
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def CreationDate(self, zone=None):
         # Dublin Core Date element - date resource created.
         if zone is None:
@@ -481,7 +452,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         else:
             return 'Unknown'
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def EffectiveDate(self, zone=None):
         # Dublin Core Date element - date resource becomes effective.
         if zone is None:
@@ -490,7 +461,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         ed = datify(ed)
         return ed and ed.toZone(zone).ISO() or 'None'
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def ExpirationDate(self, zone=None):
         # Dublin Core Date element - date resource expires.
         if zone is None:
@@ -499,7 +470,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         ed = datify(ed)
         return ed and ed.toZone(zone).ISO() or 'None'
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def ModificationDate(self, zone=None):
         # Dublin Core Date element - date resource last modified.
         if zone is None:
@@ -507,24 +478,24 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         date = datify(self.modified())
         return date.toZone(zone).ISO()
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Identifier(self):
         # Dublin Core Identifier element - resource ID.
         return self.absolute_url()
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Language(self):
         # Dublin Core Language element - resource language.
         return self.language
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def Rights(self):
         # Dublin Core Rights element - resource copyright.
         return safe_utf8(self.rights)
 
     # ICatalogableDublinCore
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def created(self):
         # Dublin Core Date element - date resource created.
         # allow for non-existent creation_date, existed always
@@ -532,7 +503,7 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         date = datify(date)
         return date is None and FLOOR_DATE or date
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def effective(self):
         # Dublin Core Date element - date resource becomes effective.
         date = getattr(self, 'effective_date', _marker)
@@ -541,25 +512,25 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
         date = datify(date)
         return date is None and FLOOR_DATE or date
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def expires(self):
         # Dublin Core Date element - date resource expires.
         date = getattr(self, 'expiration_date', None)
         date = datify(date)
         return date is None and CEILING_DATE or date
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def modified(self):
         # Dublin Core Date element - date resource last modified.
         date = self.modification_date
         if date is None:
             # Upgrade.
-            date = DateTime(self._p_mtime)
+            date = datetime.fromtimestamp(self._p_mtime)
             self.modification_date = date
         date = datify(date)
         return date
 
-    @security.protected(permissions.View)
+    # @security.protected(permissions.View)
     def isEffective(self, date):
         # Is the date within the resource's effective range?
         pastEffective = (
@@ -570,66 +541,66 @@ class DexterityContent(DAVResourceMixin, PortalContent, PropertyManager,
 
     # IMutableDublinCore
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setTitle(self, title):
         # Set Dublin Core Title element - resource name.
         self.title = safe_unicode(title)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setDescription(self, description):
         # Set Dublin Core Description element - resource summary.
         self.description = safe_unicode(description)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setCreators(self, creators):
         # Set Dublin Core Creator elements - resource authors.
-        if isinstance(creators, basestring):
+        if isinstance(creators, str):
             creators = [creators]
         self.creators = tuple(safe_unicode(c.strip()) for c in creators)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setSubject(self, subject):
         # Set Dublin Core Subject element - resource keywords.
-        if isinstance(subject, basestring):
+        if isinstance(subject, str):
             subject = [subject]
         self.subject = tuple(safe_unicode(s.strip()) for s in subject)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setContributors(self, contributors):
         # Set Dublin Core Contributor elements - resource collaborators.
-        if isinstance(contributors, basestring):
+        if isinstance(contributors, str):
             contributors = contributors.split(';')
         self.contributors = tuple(
             safe_unicode(c.strip()) for c in contributors)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setEffectiveDate(self, effective_date):
         # Set Dublin Core Date element - date resource becomes effective.
         self.effective_date = datify(effective_date)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setExpirationDate(self, expiration_date):
         # Set Dublin Core Date element - date resource expires.
         self.expiration_date = datify(expiration_date)
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setFormat(self, format):
         # Set Dublin Core Format element - resource format.
         self.format = format
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setLanguage(self, language):
         # Set Dublin Core Language element - resource language.
         self.language = language
 
-    @security.protected(permissions.ModifyPortalContent)
+    # @security.protected(permissions.ModifyPortalContent)
     def setRights(self, rights):
         # Set Dublin Core Rights element - resource copyright.
         self.rights = safe_unicode(rights)
 
 
 @implementer(IDexterityItem)
-class Item(PasteBehaviourMixin, BrowserDefaultMixin, DexterityContent):
+class Item(DexterityContent):
     """A non-containerish, CMFish item
     """
 
@@ -638,41 +609,26 @@ class Item(PasteBehaviourMixin, BrowserDefaultMixin, DexterityContent):
 
     isPrincipiaFolderish = 0
 
-    manage_options = PropertyManager.manage_options + ({
+    manage_options = ({
         'label': 'View',
         'action': 'view',
-    },) + CMFCatalogAware.manage_options + SimpleItem.manage_options
+    },)
 
     # Be explicit about which __getattr__ to use
     __getattr__ = DexterityContent.__getattr__
 
 
 @implementer(IDexterityContainer)
-class Container(
-        PasteBehaviourMixin, DAVCollectionMixin, BrowserDefaultMixin,
-        CMFCatalogAware, CMFOrderedBTreeFolderBase, DexterityContent):
+class Container(OrderedContainer, DexterityContent):
     """Base class for folderish items
     """
 
     __providedBy__ = FTIAwareSpecification()
     __allow_access_to_unprotected_subobjects__ = AttributeValidator()
 
-    security = ClassSecurityInfo()
-    security.declareProtected(
-        acpermissions.copy_or_move, 'manage_copyObjects')
-    security.declareProtected(
-        permissions.ModifyPortalContent, 'manage_cutObjects')
-    security.declareProtected(
-        permissions.ModifyPortalContent, 'manage_pasteObjects')
-    security.declareProtected(
-        permissions.ModifyPortalContent, 'manage_renameObject')
-    security.declareProtected(
-        permissions.ModifyPortalContent, 'manage_renameObjects')
+    # security = ClassSecurityInfo()
 
     isPrincipiaFolderish = 1
-
-    # make sure CMFCatalogAware's manage_options don't take precedence
-    manage_options = PortalFolderBase.manage_options
 
     # Make sure PortalFolder's accessors and mutators don't take precedence
     Title = DexterityContent.Title
@@ -681,7 +637,7 @@ class Container(
     setDescription = DexterityContent.setDescription
 
     def __init__(self, id=None, **kwargs):
-        CMFOrderedBTreeFolderBase.__init__(self, id)
+        OrderedContainer.__init__(self, id)
         DexterityContent.__init__(self, id, **kwargs)
 
     def __getattr__(self, name):
@@ -691,9 +647,9 @@ class Container(
             pass
 
         # Be specific about the implementation we use
-        return CMFOrderedBTreeFolderBase.__getattr__(self, name)
+        return OrderedContainer.__getattr__(self, name)
 
-    @security.protected(permissions.DeleteObjects)
+    # @security.protected(permissions.DeleteObjects)
     def manage_delObjects(self, ids=None, REQUEST=None):
         """Delete the contained objects with the specified ids.
 

@@ -6,12 +6,6 @@ from zope.lifecycleevent.interfaces import IModificationDescription
 import zope.schema
 
 try:
-    from zope.app.content import IContentType
-except ImportError:
-    class IContentType(Interface):
-        pass
-
-try:
     from Products.CMFCore.interfaces import ITypeInformation
 except ImportError:
     class ITypeInformation(Interface):

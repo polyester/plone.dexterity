@@ -6,17 +6,9 @@
 
     <i18n:registerTranslations directory="locales"/>
 
-    <include package="Products.CMFCore" />
-
     <include package="plone.behavior" />
-    <include package="plone.folder" />
     <include package="plone.supermodel" />
-    <include package="plone.rfc822" />
     <include package="plone.uuid" />
-    <include package="plone.z3cform" />
-
-    <include package=".browser" />
-    <include package=".fti" />
 
     <!-- Re-index content when it's modified -->
     <subscriber

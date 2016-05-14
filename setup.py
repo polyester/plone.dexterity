@@ -37,6 +37,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'setuptools',
+        'python-dateutil',
         'plone.behavior>=1.0b5',
         'plone.supermodel>=1.0b2',
         'plone.synchronize',

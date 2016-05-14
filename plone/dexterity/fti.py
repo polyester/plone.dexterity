@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
-from AccessControl import getSecurityManager
-from Acquisition import aq_base
-from Products.CMFCore.interfaces import ISiteRoot
-from Products.CMFDynamicViewFTI import fti as base
 from plone.dexterity import utils
 from plone.dexterity.factory import DexterityFactory
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.interfaces import IDexterityFTIModificationDescription
 from plone.dexterity.schema import SchemaInvalidatedEvent
-from plone.dexterity.schema import portalTypeToSchemaName
 from plone.supermodel import loadString, loadFile
 from plone.supermodel.model import Model
-from plone.supermodel.utils import syncSchema
 from zope.component import getAllUtilitiesRegisteredFor
 from zope.component import getUtility
 from zope.component import queryUtility
@@ -21,10 +15,8 @@ from zope.i18nmessageid import Message
 from zope.interface import implementer
 from zope.lifecycleevent import modified
 from zope.security.interfaces import IPermission
-from zope.site.hooks import getSiteManager
-import logging
+from zope.component.hooks import getSiteManager
 import os.path
-import plone.dexterity.schema
 
 
 @implementer(IDexterityFTIModificationDescription)
@@ -36,13 +28,13 @@ class DexterityFTIModificationDescription(object):
 
 
 @implementer(IDexterityFTI)
-class DexterityFTI(base.DynamicViewTypeInformation):
+class DexterityFTI(object):
     """A Dexterity FTI
     """
 
     meta_type = "Dexterity FTI"
 
-    _properties = base.DynamicViewTypeInformation._properties + (
+    _properties = (
         {
             'id': 'add_permission',
             'type': 'selection',
@@ -228,29 +220,7 @@ class DexterityFTI(base.DynamicViewTypeInformation):
         return not(self.schema)
 
     def lookupSchema(self):
-        schema = None
-
-        # If a specific schema is given, use it
-        if self.schema:
-            try:
-                schema = utils.resolveDottedName(self.schema)
-            except ImportError:
-                logging.warning(
-                    u"Schema %s set for type %s cannot be resolved" %
-                    (self.schema, self.getId())
-                )
-                # fall through to return a fake class with no
-                # fields so that end user code doesn't break
-
-        if schema:
-            return schema
-
-        # Otherwise, look up a dynamic schema. This will query the model for
-        # an unnamed schema if it is the first time it is looked up.
-        # See schema.py
-
-        schemaName = portalTypeToSchemaName(self.getId())
-        return getattr(plone.dexterity.schema.generated, schemaName)
+        return utils.resolveDottedName(self.schema)
 
     def lookupModel(self):
 
@@ -386,9 +356,7 @@ def register(fti):
          - register an add view
     """
 
-    fti = aq_base(fti)  # remove acquisition wrapper
-    site = getUtility(ISiteRoot)
-    site_manager = getSiteManager(site)
+    site_manager = getSiteManager()
 
     portal_type = fti.getId()
 
@@ -532,16 +500,4 @@ def ftiModified(object, event):
        or 'model_source' in mod \
        or 'model_file' in mod \
        or 'schema_policy' in mod:
-
-        # Determine if we need to re-sync a dynamic schema
-        if (fti.model_source or fti.model_file) \
-           and ('model_source' in mod or 'model_file' in mod or 'schema_policy' in mod):
-
-            schemaName = portalTypeToSchemaName(portal_type)
-            schema = getattr(plone.dexterity.schema.generated, schemaName)
-
-            model = fti.lookupModel()
-            sync_bases = 'schema_policy' in mod
-            syncSchema(model.schema, schema, overwrite=True, sync_bases=sync_bases)
-
         notify(SchemaInvalidatedEvent(portal_type))
