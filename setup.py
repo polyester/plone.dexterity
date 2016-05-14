@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 from setuptools import setup
 from setuptools import find_packages
 
@@ -35,24 +36,12 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        # 'Acquisition',
-        # 'AccessControl',
-        'DateTime>=4.0.1',
+        'setuptools',
         'plone.alterego',
-        'plone.autoform>=1.0b2',
         'plone.behavior>=1.0b5',
-        'plone.folder',
-        'plone.memoize',
-        'plone.rfc822',
         'plone.supermodel>=1.0b2',
         'plone.synchronize',
         'plone.uuid',
-        'plone.z3cform>=0.6.0',
-        'Products.CMFCore',
-        'Products.CMFDynamicViewFTI',
-        'Products.statusmessages',
-        'setuptools',
-        'ZODB3',
         'zope.annotation',
         'zope.browser',
         'zope.component',
@@ -66,8 +55,24 @@ setup(
         'zope.schema',
         'zope.security',
         'zope.size',
+    ] + ([
+        'zope.dublincore',
+        'ZODB',
+    ] if sys.version_info[:2] > (2, 7) else []) + ([
+        # 'Acquisition',
+        # 'AccessControl',
+        'DateTime>=4.0.1',
+        'plone.autoform>=1.0b2',
+        'plone.folder',
+        'plone.memoize',
+        'plone.rfc822',
+        'plone.z3cform>=0.6.0',
+        'Products.CMFCore',
+        'Products.CMFDynamicViewFTI',
+        'Products.statusmessages',
+        'ZODB3',
         'Zope2',
-    ],
+    ] if sys.version_info[:2] < (3, 0) else []),
     extras_require={
         'test': [
             'plone.mocktestcase>=1.0b3',
