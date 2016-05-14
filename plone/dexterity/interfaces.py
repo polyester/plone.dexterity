@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from Products.CMFCore.interfaces import ITypeInformation
 from zope.component.interfaces import IFactory
 from zope.component.interfaces import IObjectEvent
 from zope.interface import Interface, Attribute
@@ -10,6 +9,12 @@ try:
     from zope.app.content import IContentType
 except ImportError:
     class IContentType(Interface):
+        pass
+
+try:
+    from Products.CMFCore.interfaces import ITypeInformation
+except ImportError:
+    class ITypeInformation(Interface):
         pass
 
 # id for pseudo-resource used to expose data for folderish items over WebDAV
