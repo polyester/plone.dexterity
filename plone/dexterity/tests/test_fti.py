@@ -307,7 +307,7 @@ class TestFTI(MockTestCase):
         ).result(True)
 
         getSecurityManager_mock = self.mocker.replace(
-            'AccessControl.getSecurityManager'
+            'zopepolicy.ZopeSecurityPolicy.getSecurityManager'
         )
         self.expect(getSecurityManager_mock()).result(security_manager_mock)
 
@@ -339,7 +339,7 @@ class TestFTI(MockTestCase):
         ).result(False)
 
         getSecurityManager_mock = self.mocker.replace(
-            'AccessControl.getSecurityManager'
+            'zopepolicy.ZopeSecurityPolicy.getSecurityManager'
         )
         self.expect(getSecurityManager_mock()).result(security_manager_mock)
 

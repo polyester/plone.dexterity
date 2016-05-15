@@ -13,6 +13,7 @@ from zope.container.interfaces import INameChooser
 from zope.dottedname.resolve import resolve
 from zope.event import notify
 from zope.lifecycleevent import ObjectCreatedEvent
+from zope.security.interfaces import Unauthorized
 
 import datetime
 import logging

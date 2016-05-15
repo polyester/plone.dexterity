@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from AccessControl import Unauthorized
 from Products.statusmessages.interfaces import IStatusMessage
 from plone.autoform.interfaces import IFormFieldProvider
 from plone.behavior.interfaces import IBehaviorAssignable
@@ -31,6 +30,7 @@ from zope.interface import alsoProvides
 from zope.interface import implementer
 from zope.interface import provider
 from zope.publisher.browser import TestRequest as TestRequestBase
+from zope.security.interfaces import Unauthorized
 
 import mocker
 import unittest

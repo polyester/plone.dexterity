@@ -91,7 +91,7 @@ class TestAttributeProtection(MockTestCase):
         # mock security manager
         securityManager_mock = self.mocker.mock()
         getSecurityManager_mock = self.mocker.replace(
-            'AccessControl.getSecurityManager'
+            'zopepolicy.ZopeSecurityPolicy.getSecurityManager'
         )
 
         # expectations
@@ -238,7 +238,7 @@ class TestAttributeProtection(MockTestCase):
         # mock security manager
         securityManager_mock = self.mocker.mock()
         getSecurityManager_mock = self.mocker.replace(
-            'AccessControl.getSecurityManager'
+            'zopepolicy.ZopeSecurityPolicy.getSecurityManager'
         )
 
         # expectations
@@ -395,7 +395,7 @@ class TestAttributeProtection(MockTestCase):
             securityManager_mock.checkPermission("View foo", item)
         ).result(True)
         getSecurityManager_mock = self.mocker.replace(
-            'AccessControl.getSecurityManager'
+            'zopepolicy.ZopeSecurityPolicy.getSecurityManager'
         )
         self.expect(
             getSecurityManager_mock()

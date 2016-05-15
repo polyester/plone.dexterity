@@ -9,6 +9,71 @@
     <include package="plone.behavior" />
     <include package="plone.supermodel" />
     <include package="plone.uuid" />
+    <include package="zope.securitypolicy" />
+
+    <permission
+      id="plone.ModifyPortalContent"
+      title="Modify portal content"
+      />
+
+    <permission
+      id="plone.DeleteObjects"
+      title="Delete objects"
+      />
+
+
+    <class class=".content.DexterityContent">
+        <require
+            permission="zope.View"
+            attributes="Title,
+                        Description,
+                        Type,
+                        listCreators,
+                        Creator,
+                        Subject,
+                        Publisher,
+                        listContributors,
+                        Contributors,
+                        Date,
+                        CreationDate,
+                        EffectiveDate,
+                        ExpirationDate,
+                        ModificationDate,
+                        Identifier,
+                        Language,
+                        Rights,
+                        created,
+                        effective,
+                        expires,
+                        modified,
+                        isEffective" />
+        <require
+            permission="plone.ModifyPortalContent"
+            attributes="addCreator,
+                        setModificationDate,
+                        setTitle,
+                        setDescription,
+                        setCreators,
+                        setSubject,
+                        setContributors,
+                        setEffectiveDate,
+                        setExpirationDate,
+                        setFormat,
+                        setLanguage,
+                        setRights" />
+      </class>
+      <class class=".content.Container">
+        <require
+            permission="plone.ModifyPortalContent"
+            attributes="manage_copyObjects,
+                        manage_cutObjects,
+                        manage_pasteObjects,
+                        manage_renameObject,
+                        manage_renameObjects" />
+        <require
+            permission="plone.DeleteObjects"
+            attributes="manage_delObjects" />
+      </class>
 
     <!-- Re-index content when it's modified -->
     <subscriber

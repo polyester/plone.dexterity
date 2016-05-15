@@ -9,13 +9,15 @@ from plone.supermodel.model import Model
 from zope.component import getAllUtilitiesRegisteredFor
 from zope.component import getUtility
 from zope.component import queryUtility
+from zope.component.hooks import getSiteManager
 from zope.component.interfaces import IFactory
 from zope.event import notify
 from zope.i18nmessageid import Message
 from zope.interface import implementer
 from zope.lifecycleevent import modified
 from zope.security.interfaces import IPermission
-from zope.component.hooks import getSiteManager
+from zope.securitypolicy import zopepolicy
+from zope.site.hooks import getSiteManager
 import os.path
 
 
@@ -277,10 +279,8 @@ class DexterityFTI(object):
             return False
 
         return bool(
-            getSecurityManager().checkPermission(
-                permission.title,
-                container
-            )
+            zopepolicy.ZopeSecurityPolicy().checkPermission(
+                permission.title, container)
         )
 
     #
