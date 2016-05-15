@@ -53,6 +53,7 @@ setup(
         'zope.publisher',
         'zope.schema',
         'zope.security',
+        'zope.securitypolicy',
         'zope.size',
         'zope.dublincore',
         'ZODB',
