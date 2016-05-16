@@ -77,12 +77,12 @@
       </class>
 
     <!-- Re-index content when it's modified -->
-    <subscriber
+<!--     <subscriber
         for=".interfaces.IDexterityContent
              zope.lifecycleevent.interfaces.IObjectModifiedEvent"
         handler=".content.reindexOnModify"
         />
-
+ -->
     <!-- Schema cache -->
     <subscriber handler=".schema.invalidate_schema" />
 
