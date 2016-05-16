@@ -4,14 +4,14 @@
     xmlns:five="http://namespaces.zope.org/five"
     i18n_domain="plone.dexterity">
 
+    <include package="zope.i18n" file="meta.zcml" />
     <i18n:registerTranslations directory="locales"/>
 
     <include package="plone.behavior" />
     <include package="plone.supermodel" />
     <include package="plone.uuid" />
-
-    <include package="zope.securitypolicy" file="meta.zcml" />
     <include package="zope.securitypolicy" />
+    <include package="zope.dublincore" />
 
     <permission
       id="plone.ModifyPortalContent"
