@@ -138,7 +138,6 @@ class DexterityFTI(Persistent):
     factory = u""
 
     def __init__(self, id, *args, **kwargs):
-        super(DexterityFTI, self).__init__(*args, **kwargs)
 
         self.id = id
 
