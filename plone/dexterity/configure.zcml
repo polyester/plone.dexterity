@@ -142,38 +142,4 @@
         handler=".fti.ftiModified"
         />
 
-    <!-- File representation (FTP/WebDAV support) -->
-    <adapter factory=".filerepresentation.DefaultDirectoryFactory" />
-    <adapter factory=".filerepresentation.DefaultFileFactory" />
-
-    <adapter
-        provides="zope.filerepresentation.interfaces.IRawReadFile"
-        factory=".filerepresentation.DefaultReadFile"
-        />
-    <adapter factory=".filerepresentation.DefaultWriteFile" />
-
-    <!-- GenericSetup structure import/export support -->
-    <adapter
-        factory=".exportimport.DexterityContentExporterImporter"
-        provides="Products.GenericSetup.interfaces.IFilesystemImporter"
-        for=".interfaces.IDexterityItem"
-        />
-    <adapter
-        factory=".exportimport.DexterityContentExporterImporter"
-        provides="Products.GenericSetup.interfaces.IFilesystemExporter"
-        for=".interfaces.IDexterityItem"
-        />
-    <adapter
-        factory=".exportimport.DexterityContentExporterImporter"
-        provides="Products.GenericSetup.interfaces.IFilesystemImporter"
-        for=".interfaces.IDexterityContainer"
-        />
-    <adapter
-        factory=".exportimport.DexterityContentExporterImporter"
-        provides="Products.GenericSetup.interfaces.IFilesystemExporter"
-        for=".interfaces.IDexterityContainer"
-        />
-
-    <!-- PrimaryFieldInfo -->
-    <adapter factory=".primary.PrimaryFieldInfo"/>
 </configure>
