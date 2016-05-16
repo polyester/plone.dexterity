@@ -138,7 +138,6 @@ class DexterityFTI(Persistent):
     factory = u""
 
     def __init__(self, id, *args, **kwargs):
-
         self.id = id
 
         # if 'aliases' not in kwargs:
@@ -186,6 +185,11 @@ class DexterityFTI(Persistent):
         klass = utils.resolveDottedName(self.klass)
         if klass is not None:
             self.content_meta_type = getattr(klass, 'meta_type', None)
+
+        if 'behaviors' in kwargs:
+            self.behaviors = kwargs['behaviors']
+        if 'add_permission' in kwargs:
+            self.add_permission = kwargs['add_permission']
 
     def getId(self):
         return self.id
