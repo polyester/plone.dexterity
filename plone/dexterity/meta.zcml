@@ -5,4 +5,6 @@
     <!-- Include ZCML directive from plone.behavior -->
     <include package="plone.behavior" file="meta.zcml" />
 
+    <include package="zope.securitypolicy" file="meta.zcml" />
+
 </configure>
