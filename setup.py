@@ -54,6 +54,7 @@ setup(
         'zope.schema',
         'zope.security',
         'zope.securitypolicy',
+        'zope.site',
         'zope.size',
         'zope.dublincore',
         'ZODB',
