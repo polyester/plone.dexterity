@@ -601,7 +601,7 @@ class Container(OrderedContainer, DexterityContent):
     setDescription = DexterityContent.setDescription
 
     def __init__(self, id=None, **kwargs):
-        OrderedContainer.__init__(self, id)
+        OrderedContainer.__init__(self)
         DexterityContent.__init__(self, id, **kwargs)
 
     def __getattr__(self, name):
