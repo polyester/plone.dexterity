@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from Products.statusmessages.interfaces import IStatusMessage
-from plone.autoform.interfaces import IFormFieldProvider
+from plone.dexterity.interfaces import IFormFieldProvider
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.browser.add import DefaultAddForm
 from plone.dexterity.browser.add import DefaultAddView

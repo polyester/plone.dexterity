@@ -6,7 +6,7 @@ from ZPublisher.HTTPResponse import HTTPResponse
 from ZPublisher.Iterators import IStreamIterator
 from email.Message import Message
 from mocker import ANY
-from plone.autoform.interfaces import IFormFieldProvider
+from plone.dexterity.interfaces import IFormFieldProvider
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.browser.traversal import DexterityPublishTraverse
 from plone.dexterity.content import Container

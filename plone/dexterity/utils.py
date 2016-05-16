@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.interfaces import IDexterityFTI
+from plone.dexterity.interfaces import IFormFieldProvider
 from plone.dexterity.schema import SCHEMA_CACHE
 from plone.dexterity.schema import SchemaNameEncoder  # noqa bbb
 from plone.dexterity.schema import schemaNameToPortalType  # noqa bbb

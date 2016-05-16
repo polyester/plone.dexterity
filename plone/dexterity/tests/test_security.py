@@ -31,7 +31,7 @@ class TestAttributeProtection(MockTestCase):
             dict(test='zope2.View', foo='foo.View')
         )
 
-        from plone.autoform.interfaces import IFormFieldProvider
+        from plone.dexterity.interfaces import IFormFieldProvider
 
         @provider(IFormFieldProvider)
         class ITestBehavior(Interface):
@@ -178,7 +178,7 @@ class TestAttributeProtection(MockTestCase):
             dict(test='zope2.View', foo='foo.View')
         )
 
-        from plone.autoform.interfaces import IFormFieldProvider
+        from plone.dexterity.interfaces import IFormFieldProvider
 
         @provider(IFormFieldProvider)
         class ITestBehavior(Interface):

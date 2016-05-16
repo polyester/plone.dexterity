@@ -180,3 +180,8 @@ class IEditFinishedEvent(IObjectEvent):
 # Views
 class IDexterityEditForm(Interface):
     """The edit form for a Dexterity content type."""
+
+
+class IFormFieldProvider(Interface):
+    """Marker interface for schemata that provide form fields.
+    """

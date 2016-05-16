@@ -16,7 +16,7 @@ class TestUtils(MockTestCase):
     def test_getAdditionalSchemata(self):
         from plone.dexterity.interfaces import IDexterityFTI
         from plone.behavior.interfaces import IBehavior
-        from plone.autoform.interfaces import IFormFieldProvider
+        from plone.dexterity.interfaces import IFormFieldProvider
         from zope.interface import Interface
         from zope.interface import providedBy
 
