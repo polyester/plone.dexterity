@@ -611,7 +611,7 @@ class Container(OrderedContainer, DexterityContent):
             pass
 
         # Be specific about the implementation we use
-        return OrderedContainer.__getattr__(self, name)
+        return OrderedContainer.get(self, name)
 
     def manage_delObjects(self, ids=None, REQUEST=None):
         """Delete the contained objects with the specified ids.
@@ -682,4 +682,4 @@ def reindexOnModify(content, event):
     # NOTE: We are not using event.descriptions because the field names may
     # not match index names.
 
-    content.reindexObject()
+    # content.reindexObject()
