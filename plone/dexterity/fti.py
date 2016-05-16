@@ -19,6 +19,7 @@ from zope.security.interfaces import IPermission
 from zope.securitypolicy import zopepolicy
 from zope.site.hooks import getSiteManager
 import os.path
+from persistent import Persistent
 
 
 @implementer(IDexterityFTIModificationDescription)
@@ -30,7 +31,7 @@ class DexterityFTIModificationDescription(object):
 
 
 @implementer(IDexterityFTI)
-class DexterityFTI(object):
+class DexterityFTI(Persistent):
     """A Dexterity FTI
     """
 
@@ -134,26 +135,29 @@ class DexterityFTI(object):
     model_file = u""
     schema = u""
     schema_policy = u"dexterity"
+    factory = u""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, id, *args, **kwargs):
         super(DexterityFTI, self).__init__(*args, **kwargs)
 
-        if 'aliases' not in kwargs:
-            self.setMethodAliases(self.default_aliases)
+        self.id = id
 
-        if 'actions' not in kwargs:
-            for action in self.default_actions:
-                self.addAction(id=action['id'],
-                               name=action['title'],
-                               action=action['action'],
-                               condition=action.get('condition'),
-                               permission=action.get('permissions', ()),
-                               category=action.get('category', 'object'),
-                               visible=action.get('visible', True))
+        # if 'aliases' not in kwargs:
+        #     self.setMethodAliases(self.default_aliases)
+
+        # if 'actions' not in kwargs:
+        #     for action in self.default_actions:
+        #         self.addAction(id=action['id'],
+        #                        name=action['title'],
+        #                        action=action['action'],
+        #                        condition=action.get('condition'),
+        #                        permission=action.get('permissions', ()),
+        #                        category=action.get('category', 'object'),
+        #                        visible=action.get('visible', True))
 
         # Default factory name to be the FTI name
         if not self.factory:
-            self.factory = self.getId()
+            self.factory = self.id
 
         # In CMF (2.2+, but we've backported it) the property add_view_expr is
         # used to construct an action in the 'folder/add' category. The
@@ -171,18 +175,21 @@ class DexterityFTI(object):
         # context, request and IDexterityFTI that can construct an add view
         # for any Dexterity schema.
 
-        if not self.add_view_expr:
-            add_view_expr = kwargs.get(
-                'add_view_expr',
-                "string:${folder_url}/++add++%s" % self.getId()
-            )
-            self._setPropValue('add_view_expr', add_view_expr)
+        # if not self.add_view_expr:
+        #     add_view_expr = kwargs.get(
+        #         'add_view_expr',
+        #         "string:${folder_url}/++add++%s" % self.getId()
+        #     )
+        #     self._setPropValue('add_view_expr', add_view_expr)
 
         # Set the content_meta_type from the klass
 
         klass = utils.resolveDottedName(self.klass)
         if klass is not None:
             self.content_meta_type = getattr(klass, 'meta_type', None)
+
+    def getId(self):
+        return self.id
 
     def Title(self):
         if self.title and self.i18n_domain:
