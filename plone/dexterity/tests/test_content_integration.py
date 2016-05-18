@@ -2,7 +2,7 @@
 from plone.testing.zca import UNIT_TESTING
 import unittest
 
-# TODO: End to end tests that ensure components are properly wired up
+# TODO: End to end tests that ensure components are properly wired up  # noqa
 #  - for now, we have some tests in example.dexterity, but we should have
 #    more specific tests here.
 
@@ -18,7 +18,7 @@ class TestUUIDIntegration(unittest.TestCase):
         from zope.configuration import xmlconfig
 
         zope.component.testing.setUp()
-        xmlconfig.file('configure.zcml', plone.uuid)
+        xmlconfig.file('configure.zcml', plone.uuid)  # noqa
 
     def test_uuid_assigned_on_creation(self):
         from plone.dexterity.content import Item

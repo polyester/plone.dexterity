@@ -15,35 +15,35 @@ class TestFactory(MockTestCase):
 
     def test_title(self):
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.title).result("Mock type")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.title).result('Mock type')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
-        self.assertEqual("Mock type", factory.title)
+        factory = DexterityFactory(portal_type='testtype')
+        self.assertEqual('Mock type', factory.title)
 
     def test_description(self):
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.description).result("Mock type description")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.description).result('Mock type description')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
-        self.assertEqual("Mock type description", factory.description)
+        factory = DexterityFactory(portal_type='testtype')
+        self.assertEqual('Mock type description', factory.description)
 
     def test_get_interfaces(self):
         fti_mock = self.mocker.mock(DexterityFTI)
         self.expect(fti_mock.lookupSchema()).result(IDummy)
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
+        factory = DexterityFactory(portal_type='testtype')
         spec = factory.getInterfaces()
 
-        self.assertEqual(u"testtype", spec.__name__)
+        self.assertEqual('testtype', spec.__name__)
         self.assertEqual([IDummy, Interface], list(spec.flattened()))
 
     # We expect the following when creating an object from the factory:
@@ -57,7 +57,7 @@ class TestFactory(MockTestCase):
 
         # Object returned by class
         obj_mock = self.mocker.mock()
-        self.expect(obj_mock.portal_type).result(u"testtype")
+        self.expect(obj_mock.portal_type).result('testtype')
 
         # Class set by factory
         klass_mock = self.mocker.mock()
@@ -65,20 +65,20 @@ class TestFactory(MockTestCase):
 
         # Resolver
         resolver_mock = self.mocker.replace(
-            "plone.dexterity.utils.resolveDottedName"
+            'plone.dexterity.utils.resolveDottedName'
         )
         self.expect(
-            resolver_mock("my.mocked.ContentTypeClass")
+            resolver_mock('my.mocked.ContentTypeClass')
         ).result(klass_mock)
 
         # FTI
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.klass).result("my.mocked.ContentTypeClass")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.klass).result('my.mocked.ContentTypeClass')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
+        factory = DexterityFactory(portal_type='testtype')
         self.assertEqual(obj_mock, factory())
 
     def test_create_sets_portal_type_if_not_set(self):
@@ -89,7 +89,7 @@ class TestFactory(MockTestCase):
             obj_mock.portal_type
         ).throw(AttributeError)  # -> need to set portal_type
 
-        obj_mock.portal_type = u"testtype"
+        obj_mock.portal_type = 'testtype'
 
         # Class set by factory
         klass_mock = self.mocker.mock()
@@ -97,20 +97,20 @@ class TestFactory(MockTestCase):
 
         # Resolver
         resolver_mock = self.mocker.replace(
-            "plone.dexterity.utils.resolveDottedName"
+            'plone.dexterity.utils.resolveDottedName'
         )
         self.expect(
-            resolver_mock("my.mocked.ContentTypeClass")
+            resolver_mock('my.mocked.ContentTypeClass')
         ).result(klass_mock)
 
         # FTI
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.klass).result("my.mocked.ContentTypeClass")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.klass).result('my.mocked.ContentTypeClass')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
+        factory = DexterityFactory(portal_type='testtype')
         self.assertEqual(obj_mock, factory())
 
     def test_create_sets_portal_type_if_wrong(self):
@@ -120,7 +120,7 @@ class TestFactory(MockTestCase):
         self.expect(
             obj_mock.portal_type
         ).result('othertype')  # -> need to fix portal_type
-        obj_mock.portal_type = u"testtype"
+        obj_mock.portal_type = 'testtype'
 
         # Class set by factory
         klass_mock = self.mocker.mock()
@@ -128,27 +128,27 @@ class TestFactory(MockTestCase):
 
         # Resolver
         resolver_mock = self.mocker.replace(
-            "plone.dexterity.utils.resolveDottedName"
+            'plone.dexterity.utils.resolveDottedName'
         )
         self.expect(
-            resolver_mock("my.mocked.ContentTypeClass")
+            resolver_mock('my.mocked.ContentTypeClass')
         ).result(klass_mock)
 
         # FTI
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.klass).result("my.mocked.ContentTypeClass")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.klass).result('my.mocked.ContentTypeClass')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
+        factory = DexterityFactory(portal_type='testtype')
         self.assertEqual(obj_mock, factory())
 
     def test_create_initialises_schema_if_not_provided(self):
 
         # Object returned by class
         obj_mock = self.mocker.mock()
-        self.expect(obj_mock.portal_type).result(u"testtype")
+        self.expect(obj_mock.portal_type).result('testtype')
 
         # Class set by factory
         klass_mock = self.mocker.mock()
@@ -156,49 +156,49 @@ class TestFactory(MockTestCase):
 
         # Resolver
         resolver_mock = self.mocker.replace(
-            "plone.dexterity.utils.resolveDottedName"
+            'plone.dexterity.utils.resolveDottedName'
         )
         self.expect(
-            resolver_mock("my.mocked.ContentTypeClass")
+            resolver_mock('my.mocked.ContentTypeClass')
         ).result(klass_mock)
 
         # FTI
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.klass).result("my.mocked.ContentTypeClass")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.klass).result('my.mocked.ContentTypeClass')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
+        factory = DexterityFactory(portal_type='testtype')
         self.assertEqual(obj_mock, factory())
 
     def test_factory_passes_args_and_kwargs(self):
 
         # Object returned by class
         obj_mock = self.mocker.mock()
-        self.expect(obj_mock.portal_type).result(u"testtype")
+        self.expect(obj_mock.portal_type).result('testtype')
 
         # Class set by factory
         klass_mock = self.mocker.mock()
-        self.expect(klass_mock(u"id", title=u"title")).result(obj_mock)
+        self.expect(klass_mock('id', title='title')).result(obj_mock)
 
         # Resolver
         resolver_mock = self.mocker.replace(
-            "plone.dexterity.utils.resolveDottedName"
+            'plone.dexterity.utils.resolveDottedName'
         )
         self.expect(
-            resolver_mock("my.mocked.ContentTypeClass")
+            resolver_mock('my.mocked.ContentTypeClass')
         ).result(klass_mock)
 
         # FTI
         fti_mock = self.mocker.mock(DexterityFTI)
-        self.expect(fti_mock.klass).result("my.mocked.ContentTypeClass")
-        self.mock_utility(fti_mock, IDexterityFTI, name=u"testtype")
+        self.expect(fti_mock.klass).result('my.mocked.ContentTypeClass')
+        self.mock_utility(fti_mock, IDexterityFTI, name='testtype')
 
         self.replay()
 
-        factory = DexterityFactory(portal_type=u"testtype")
-        self.assertEqual(obj_mock, factory(u"id", title=u"title"))
+        factory = DexterityFactory(portal_type='testtype')
+        self.assertEqual(obj_mock, factory('id', title='title'))
 
 
 def test_suite():

@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
+from persistent import Persistent
 from plone.dexterity import utils
 from plone.dexterity.factory import DexterityFactory
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.interfaces import IDexterityFTIModificationDescription
+from plone.dexterity.schema import portalTypeToSchemaName
 from plone.dexterity.schema import SchemaInvalidatedEvent
-from plone.supermodel import loadString, loadFile
+from plone.supermodel import loadFile
+from plone.supermodel import loadString
 from plone.supermodel.model import Model
+from plone.supermodel.utils import syncSchema
 from zope.component import getAllUtilitiesRegisteredFor
-from zope.component import getUtility
+from zope.component import getGlobalSiteManager
 from zope.component import queryUtility
-from zope.component.hooks import getSiteManager
 from zope.component.interfaces import IFactory
 from zope.event import notify
 from zope.i18nmessageid import Message
@@ -17,9 +20,9 @@ from zope.interface import implementer
 from zope.lifecycleevent import modified
 from zope.security.interfaces import IPermission
 from zope.securitypolicy import zopepolicy
-from zope.site.hooks import getSiteManager
+import logging
 import os.path
-from persistent import Persistent
+import plone.dexterity.schema
 
 
 @implementer(IDexterityFTIModificationDescription)
@@ -34,8 +37,6 @@ class DexterityFTIModificationDescription(object):
 class DexterityFTI(Persistent):
     """A Dexterity FTI
     """
-
-    meta_type = "Dexterity FTI"
 
     _properties = (
         {
@@ -67,27 +68,27 @@ class DexterityFTI(Persistent):
             'type': 'string',
             'mode': 'w',
             'label': 'Schema',
-            'description': "Dotted name to the interface describing content "
-                           "type's schema.  This does not need to be given "
-                           "if model_source or model_file are given, and "
-                           "either contains an unnamed (default) schema."
+            'description': 'Dotted name to the interface describing content '
+                           'type\'s schema.  This does not need to be given '
+                           'if model_source or model_file are given, and '
+                           'either contains an unnamed (default) schema.'
         },
         {
             'id': 'model_source',
             'type': 'text',
             'mode': 'w',
             'label': 'Model source',
-            'description': "XML source for the type's model. Note that this "
-                           "takes precedence over any model file."
+            'description': 'XML source for the type\'s model. Note that this '
+                           'takes precedence over any model file.'
         },
         {
             'id': 'model_file',
             'type': 'string',
             'mode': 'w',
             'label': 'Model file',
-            'description': "Path to file containing the schema model. "
-                           "This can be relative to a package, e.g. "
-                           "'my.package:myschema.xml'."
+            'description': 'Path to file containing the schema model. '
+                           'This can be relative to a package, e.g. '
+                           '"my.package:myschema.xml".'
         },
         {
             'id': 'schema_policy',
@@ -127,15 +128,15 @@ class DexterityFTI(Persistent):
     add_permission = 'cmf.AddPortalContent'
     behaviors = []
     klass = 'plone.dexterity.content.Item'
-    model_source = """\
-<model xmlns="http://namespaces.plone.org/supermodel/schema">
+    model_source = '''\
+<model xmlns='http://namespaces.plone.org/supermodel/schema'>
     <schema />
 </model>
-"""
-    model_file = u""
-    schema = u""
-    schema_policy = u"dexterity"
-    factory = u""
+'''
+    model_file = ''
+    schema = ''
+    schema_policy = 'dexterity'
+    factory = ''
 
     def __init__(self, id, *args, **kwargs):
 
@@ -177,7 +178,7 @@ class DexterityFTI(Persistent):
         # if not self.add_view_expr:
         #     add_view_expr = kwargs.get(
         #         'add_view_expr',
-        #         "string:${folder_url}/++add++%s" % self.getId()
+        #         'string:${folder_url}/++add++{0:s}'.format(self.getId())
         #     )
         #     self._setPropValue('add_view_expr', add_view_expr)
 
@@ -228,7 +229,29 @@ class DexterityFTI(Persistent):
         return not(self.schema)
 
     def lookupSchema(self):
-        return utils.resolveDottedName(self.schema)
+        schema = None
+
+        # If a specific schema is given, use it
+        if self.schema:
+            try:
+                schema = utils.resolveDottedName(self.schema)
+            except ImportError:
+                logging.warning(
+                    'Schema {0:s} set for type {1:s} cannot be resolved'
+                    .format(self.schema, self.getId())
+                )
+                # fall through to return a fake class with no
+                # fields so that end user code doesn't break
+
+        if schema:
+            return schema
+
+        # Otherwise, look up a dynamic schema. This will query the model for
+        # an unnamed schema if it is the first time it is looked up.
+        # See schema.py
+
+        schemaName = portalTypeToSchemaName(self.getId())
+        return getattr(plone.dexterity.schema.generated, schemaName)
 
     def lookupModel(self):
 
@@ -241,11 +264,12 @@ class DexterityFTI(Persistent):
 
         elif self.schema:
             schema = self.lookupSchema()
-            return Model({u"": schema})
+            return Model({'': schema})
 
         raise ValueError(
-            "Neither model source, nor model file, nor schema is specified in "
-            "FTI %s" % self.getId()
+            'Neither model source, nor model file, '
+            'nor schema is specified in '
+            'FTI {0:s}'.format(self.getId())
         )
 
     #
@@ -285,7 +309,7 @@ class DexterityFTI(Persistent):
             return False
 
         return bool(
-            zopepolicy.ZopeSecurityPolicy().checkPermission(
+            zopepolicy.ZopeSecurityPolicy().checkPermission(  # noqa
                 permission.title, container)
         )
 
@@ -315,15 +339,15 @@ class DexterityFTI(Persistent):
         else:
             if not os.path.isabs(model_file):
                 raise ValueError(
-                    u"Model file name %s is not an absolute path and does "
-                    u"not contain a package name in %s"
-                    % (model_file, self.getId(),)
+                    'Model file name {0:s} is not an absolute path and does '
+                    'not contain a package name in {1:s}'
+                    .format(model_file, self.getId())
                 )
 
         if not os.path.isfile(model_file):
             raise ValueError(
-                u"Model file %s in %s cannot be found"
-                % (model_file, self.getId(),)
+                'Model file {0:s} in {1:s} cannot be found'
+                .format(model_file, self.getId())
             )
 
         return model_file
@@ -362,7 +386,7 @@ def register(fti):
          - register an add view
     """
 
-    site_manager = getSiteManager()
+    site_manager = getGlobalSiteManager()
 
     portal_type = fti.getId()
 
@@ -392,11 +416,7 @@ def unregister(fti, old_name=None):
         - unregister any local factory utility associated with the FTI
         - unregister any local add view associated with the FTI
     """
-    site = queryUtility(ISiteRoot)
-    if site is None:
-        return
-
-    site_manager = getSiteManager(site)
+    site_manager = getGlobalSiteManager()
 
     portal_type = old_name or fti.getId()
 
@@ -420,8 +440,8 @@ def unregister_factory(factory_name, site_manager):
 
     # If a factory with a matching name exists, remove it
     if [f for f in utilities
-        if (f.provided, f.name, f.info)
-            == (IFactory, factory_name, 'plone.dexterity.dynamic')]:
+        if (f.provided, f.name, f.info) ==
+            (IFactory, factory_name, 'plone.dexterity.dynamic')]:
         site_manager.unregisterUtility(provided=IFactory, name=factory_name)
 
 
@@ -484,8 +504,7 @@ def ftiModified(object, event):
     if 'factory' in mod:
         old_factory = mod['factory']
 
-        site = getUtility(ISiteRoot)
-        site_manager = getSiteManager(site)
+        site_manager = getGlobalSiteManager()
 
         # Remove previously registered factory, if no other type uses it.
         unregister_factory(old_factory, site_manager)
@@ -506,4 +525,18 @@ def ftiModified(object, event):
        or 'model_source' in mod \
        or 'model_file' in mod \
        or 'schema_policy' in mod:
+
+        # Determine if we need to re-sync a dynamic schema
+        if ((fti.model_source or fti.model_file) and (
+                'model_source' in mod or 'model_file'
+                in mod or 'schema_policy' in mod)):
+
+            schemaName = portalTypeToSchemaName(portal_type)
+            schema = getattr(plone.dexterity.schema.generated, schemaName)
+
+            model = fti.lookupModel()
+            sync_bases = 'schema_policy' in mod
+            syncSchema(model.schema, schema,
+                       overwrite=True, sync_bases=sync_bases)
+
         notify(SchemaInvalidatedEvent(portal_type))

@@ -6,9 +6,8 @@ from plone.dexterity.primary import PrimaryFieldInfo
 from plone.mocktestcase import MockTestCase
 from plone.rfc822.interfaces import IPrimaryField
 from zope import schema
-from zope.interface import Interface
 from zope.interface import alsoProvides
-
+from zope.interface import Interface
 import unittest
 
 

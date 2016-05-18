@@ -1,18 +1,68 @@
 # -*- coding: utf-8 -*-
 from zope.component.interfaces import IFactory
 from zope.component.interfaces import IObjectEvent
-from zope.interface import Interface, Attribute
+from zope.interface import Attribute
+from zope.interface import Interface
 from zope.lifecycleevent.interfaces import IModificationDescription
+
 import zope.schema
 
-try:
-    from Products.CMFCore.interfaces import ITypeInformation
-except ImportError:
-    class ITypeInformation(Interface):
-        pass
 
-# id for pseudo-resource used to expose data for folderish items over WebDAV
-DAV_FOLDER_DATA_ID = '_data'
+READ_PERMISSIONS_KEY = 'plone.dexterity.security.read-permissions'
+
+
+class ITypeInformation(Interface):
+    pass
+
+
+class IContentType(Interface):
+    """This interface represents a content type.
+
+    If an **interface** provides this interface type, then all objects
+    providing the **interface** are considered content objects.
+    """
+
+
+class IConstrainTypes(Interface):
+    """
+    Interface for folderish content types supporting restricting addable types
+    on a per-instance basis.
+    """
+
+    def getConstrainTypesMode():
+        """
+        Find out if add-restrictions are enabled. Returns 0 if they are
+        disabled (the type's default FTI-set allowable types is in effect),
+        1 if they are enabled (only a selected subset if allowed types will be
+        available), and -1 if the allowed types should be acquired from the
+        parent. Note that in this case, if the parent portal type is not the
+        same as the portal type of this object, fall back on the default (same
+        as 0)
+        """
+
+    def getLocallyAllowedTypes():
+        """
+        Get the list of FTI ids for the types which should be allowed to be
+        added in this container.
+        """
+
+    def getImmediatelyAddableTypes():
+        """
+        Return a subset of the FTI ids from getLocallyAllowedTypes() which
+        should be made most easily available.
+        """
+
+    def getDefaultAddableTypes():
+        """
+        Return a list of FTIs which correspond to the list of FTIs available
+        when the constraint mode = 0 (that is, the types addable without any
+        setLocallyAllowedTypes trickery involved)
+        """
+
+    def allowedContentTypes():
+        """
+        Return the list of currently permitted FTIs.
+        """
 
 
 class IDexterityFTI(ITypeInformation):
@@ -42,40 +92,40 @@ class IDexterityFTI(ITypeInformation):
         """
 
     add_permission = zope.schema.DottedName(
-        title=u"Add permission",
-        description=u"Zope 3 permission name for the permission required to "
-                    u"construct this content",
+        title='Add permission',
+        description='Zope 3 permission name for the permission required to '
+                    'construct this content',
     )
 
     behaviors = zope.schema.List(
-        title=u"Behaviors",
-        description=u"A list of behaviors that are enabled for this type. "
-                    u"See plone.behavior for more details.",
-        value_type=zope.schema.DottedName(title=u"Behavior name")
+        title='Behaviors',
+        description='A list of behaviors that are enabled for this type. '
+                    'See plone.behavior for more details.',
+        value_type=zope.schema.DottedName(title='Behavior name')
     )
 
     schema = zope.schema.DottedName(
-        title=u"Schema interface",
-        description=u"Dotted name to an interface describing the type. "
-                    u"This is not required if there is a model file or a "
-                    u"model source string containing an unnamed schema."
+        title='Schema interface',
+        description='Dotted name to an interface describing the type. '
+                    'This is not required if there is a model file or a '
+                    'model source string containing an unnamed schema.'
     )
 
     model_source = zope.schema.Text(
-        title=u"Model text",
-        description=u"XML representation of the model for this type. " +
-                    u"If this is given, it will override any model_file."
+        title='Model text',
+        description='XML representation of the model for this type. ' +
+                    'If this is given, it will override any model_file.'
     )
 
     model_file = zope.schema.Text(
-        title=u"Model file",
-        description=u"A file that contains an XML model. "
-                    u"This may be an absolute path, or one relative to a "
-                    u"package, e.g. my.package:model.xml"
+        title='Model file',
+        description='A file that contains an XML model. '
+                    'This may be an absolute path, or one relative to a '
+                    'package, e.g. my.package:model.xml'
     )
 
     hasDynamicSchema = zope.schema.Bool(
-        title=u"Whether or not the FTI uses a dynamic schema.",
+        title='Whether or not the FTI uses a dynamic schema.',
         readonly=True
     )
 
@@ -85,9 +135,9 @@ class IDexterityFTIModificationDescription(IModificationDescription):
     """
 
     attribute = zope.schema.ASCII(
-        title=u"Name of the attribute that was modified"
+        title='Name of the attribute that was modified'
     )
-    oldValue = Attribute("Old value")
+    oldValue = Attribute('Old value')
 
 
 class IDexterityFactory(IFactory):
@@ -100,8 +150,8 @@ class IDexterityFactory(IFactory):
     """
 
     portal_type = zope.schema.TextLine(
-        title=u"Portal type name",
-        description=u"The portal type this is an FTI for"
+        title='Portal type name',
+        description='The portal type this is an FTI for'
     )
 
 
@@ -119,7 +169,7 @@ class ISchemaInvalidatedEvent(Interface):
     cache.
     """
 
-    portal_type = zope.schema.TextLine(title=u"FTI name", required=False)
+    portal_type = zope.schema.TextLine(title='FTI name', required=False)
 
 
 # Content
@@ -175,11 +225,6 @@ class IEditFinishedEvent(IObjectEvent):
     """Edit was finished and contents are saved. This event is fired
     even when no changes happen (and no modified event is fired.)
     """
-
-
-# Views
-class IDexterityEditForm(Interface):
-    """The edit form for a Dexterity content type."""
 
 
 class IFormFieldProvider(Interface):

@@ -4,27 +4,27 @@ from datetime import datetime
 from dateutil.tz import tzlocal
 from persistent import Persistent
 from plone.behavior.interfaces import IBehaviorAssignable
-from zope.container.contained import Contained
-from zope.container.ordered import OrderedContainer
-from zope.dublincore.interfaces import ICMFDublinCore, IWriteZopeDublinCore
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.interfaces import IDexterityItem
+from plone.dexterity.interfaces import READ_PERMISSIONS_KEY
 from plone.dexterity.schema import SCHEMA_CACHE
 from plone.dexterity.utils import all_merged_tagged_values_dict
-from plone.dexterity.utils import datify
 from plone.dexterity.utils import iterSchemata
-from plone.dexterity.utils import safe_unicode
-from plone.dexterity.utils import safe_utf8
+from plone.dexterity.utils import safe_str
 from plone.uuid.interfaces import IAttributeUUID
 from plone.uuid.interfaces import IUUID
 from zope.annotation import IAttributeAnnotatable
 from zope.component import queryUtility
+from zope.container.contained import Contained
+from zope.container.ordered import OrderedContainer
+from zope.dublincore.interfaces import IWriteZopeDublinCore
+from zope.interface import implementer
 from zope.interface.declarations import getObjectSpecification
 from zope.interface.declarations import implementedBy
 from zope.interface.declarations import Implements
 from zope.interface.declarations import ObjectSpecificationDescriptor
-from zope.interface import implementer
+from zope.location.interfaces import IContained
 from zope.schema.interfaces import IContextAwareDefaultFactory
 from zope.security.interfaces import IPermission
 from zope.securitypolicy import zopepolicy
@@ -51,7 +51,6 @@ def _default_from_schema(context, schema, fieldname):
         return deepcopy(bound.default)
     else:
         return deepcopy(field.default)
-    return _marker
 
 
 class FTIAwareSpecification(ObjectSpecificationDescriptor):
@@ -59,7 +58,7 @@ class FTIAwareSpecification(ObjectSpecificationDescriptor):
     the object, plus the schema interface set in the FTI.
     """
 
-    def __get__(self, inst, cls=None):
+    def __get__(self, inst, cls=None):  # noqa
         # We're looking at a class - fall back on default
         if inst is None:
             return getObjectSpecification(cls)
@@ -146,15 +145,15 @@ class AttributeValidator(object):
         if name == '':
             return 1
 
-        context = aq_parent(self)
+        context = IContained(self).__parent__
 
         # we may want to cache this based on the combined mod-times
         # of fti and context, but even this is not save in the case someone
         # decides to have behaviors bound on something different than context
         # or fti, i.e. schemas for subtrees.
         protection_dict = all_merged_tagged_values_dict(
-            iterSchemata(context),
-            READ_PERMISSIONS_KEY
+                iterSchemata(context),
+                READ_PERMISSIONS_KEY
         )
 
         if name not in protection_dict:
@@ -166,55 +165,6 @@ class AttributeValidator(object):
             return policy.checkPermission(permission.title, context)
 
         return 0
-
-
-class PasteBehaviourMixin(object):
-
-    def _notifyOfCopyTo(self, container, op=0):
-        """Keep Archetypes' reference info internally when op == 1 (move)
-        because in those cases we need to keep Archetypes' refeferences.
-
-        This is only required to support legacy Archetypes' references related
-        to content within Dexterity container objects.
-        """
-        # AT BaseObject does this to prevent removing AT refs on object move
-        # See: Products.Archetypes.Referenceable.Referenceable._notifyOfCopyTo
-
-        # This isn't really safe for concurrent usage, but the
-        # worse case is not that bad and could be fixed with a reindex
-        # on the archetype tool:
-        if op == 1:
-            self._v_cp_refs = 1
-            self._v_is_cp = 0
-        if op == 0:
-            self._v_cp_refs = 0
-            self._v_is_cp = 1
-
-        # AT BaseFolderMixin does this to propagate the notify to its children
-        # See: Products.Archetypes.BaseFolder.BaseFolderMixin._notifyOfCopyTo
-
-        if isinstance(self, PortalFolderBase):
-            for child in self.objectValues():
-                try:
-                    child._notifyOfCopyTo(self, op)
-                except AttributeError:
-                    pass
-
-    def _verifyObjectPaste(self, obj, validate_src=True):
-        # Extend the paste checks from OFS.CopySupport.CopyContainer
-        # (permission checks) and
-        # Products.CMFCore.PortalFolder.PortalFolderBase (permission checks and
-        # allowed content types) to also ask the FTI if construction is
-        # allowed.
-        super(PasteBehaviourMixin, self)._verifyObjectPaste(obj, validate_src)
-        if validate_src:
-            portal_type = getattr(aq_base(obj), 'portal_type', None)
-            if portal_type:
-                fti = queryUtility(ITypeInformation, name=portal_type)
-                if fti is not None and not fti.isConstructionAllowed(self):
-                    raise ValueError(
-                        'You can not add the copied content here.'
-                    )
 
 
 @implementer(
@@ -244,7 +194,7 @@ class DexterityContent(Persistent, Contained):
     language = ''
     rights = ''
 
-    def __init__(
+    def __init__(  # noqa
             self,
             id=None, title=_marker, subject=_marker, description=_marker,
             contributors=_marker, effective_date=_marker,
@@ -350,8 +300,7 @@ class DexterityContent(Persistent, Contained):
             return
 
         if creator is None:
-            user = getSecurityManager().getUser()
-            creator = user and user.getId()
+            return
 
         # call self.listCreators() to make sure self.creators exists
         if creator and creator not in self.listCreators():
@@ -363,22 +312,16 @@ class DexterityContent(Persistent, Contained):
         When called without an argument, sets the date to now.
         """
         if modification_date is None:
-            self.modification_date = DateTime()
+            self.modification_date = datetime.now()
         else:
-            self.modification_date = datify(modification_date)
+            self.modification_date = modification_date
 
     # IMinimalDublinCore
 
     def Title(self):
-        # this is a CMF accessor, so should return utf8-encoded
-        if isinstance(self.title, str):
-            return self.title.encode('utf-8')
         return self.title or ''
 
     def Description(self):
-        # this is a CMF accessor, so should return utf8-encoded
-        if isinstance(self.description, str):
-            return self.description.encode('utf-8')
         return self.description or ''
 
     def Type(self):
@@ -391,7 +334,7 @@ class DexterityContent(Persistent, Contained):
         # List Dublin Core Creator elements - resource authors.
         if self.creators is None:
             return ()
-        return tuple(safe_utf8(c) for c in self.creators)
+        return self.creators
 
     def Creator(self):
         # Dublin Core Creator element - resource author.
@@ -402,7 +345,7 @@ class DexterityContent(Persistent, Contained):
         # Dublin Core Subject element - resource keywords.
         if self.subject is None:
             return ()
-        return tuple(safe_utf8(s) for s in self.subject)
+        return self.subject
 
     def Publisher(self):
         # Dublin Core Publisher element - resource publisher.
@@ -410,7 +353,7 @@ class DexterityContent(Persistent, Contained):
 
     def listContributors(self):
         # Dublin Core Contributor elements - resource collaborators.
-        return tuple(safe_utf8(c) for c in self.contributors)
+        return self.contributors
 
     def Contributors(self):
         # Deprecated alias of listContributors.
@@ -424,9 +367,10 @@ class DexterityContent(Persistent, Contained):
         date = getattr(self, 'effective_date', None)
         if date is None:
             date = self.modified()
-
-        date = datify(date)
-        return date.toZone(zone).ISO()
+        try:
+            return date.astimezone(zone).isoformat()
+        except (TypeError, ValueError):
+            return date.isoformat()
 
     def CreationDate(self, zone=None):
         # Dublin Core Date element - date resource created.
@@ -434,8 +378,10 @@ class DexterityContent(Persistent, Contained):
             zone = _zone
         # return unknown if never set properly
         if self.creation_date:
-            date = datify(self.creation_date)
-            return date.toZone(zone).ISO()
+            try:
+                return self.creation_date.astimezone(zone).isoformat()
+            except (TypeError, ValueError):
+                return self.creation_date.isoformat()
         else:
             return 'Unknown'
 
@@ -443,24 +389,34 @@ class DexterityContent(Persistent, Contained):
         # Dublin Core Date element - date resource becomes effective.
         if zone is None:
             zone = _zone
-        ed = getattr(self, 'effective_date', None)
-        ed = datify(ed)
-        return ed and ed.toZone(zone).ISO() or 'None'
+        if getattr(self, 'effective_date', None):
+            try:
+                return self.effective_date.astimezone(zone).isoformat()
+            except (TypeError, ValueError):
+                return self.effective_date.isoformat()
+        else:
+            return None
 
     def ExpirationDate(self, zone=None):
         # Dublin Core Date element - date resource expires.
         if zone is None:
             zone = _zone
-        ed = getattr(self, 'expiration_date', None)
-        ed = datify(ed)
-        return ed and ed.toZone(zone).ISO() or 'None'
+        if getattr(self, 'expiration_date', None):
+            try:
+                return self.expiration_date.astimezone(zone).isoformat()
+            except (TypeError, ValueError):
+                return self.expiration_date.isoformat()
+        else:
+            return None
 
     def ModificationDate(self, zone=None):
         # Dublin Core Date element - date resource last modified.
         if zone is None:
             zone = _zone
-        date = datify(self.modified())
-        return date.toZone(zone).ISO()
+        try:
+            return self.modified().astimezone(zone).isoformat()
+        except (TypeError, ValueError):
+            return self.modified().isoformat()
 
     def Identifier(self):
         # Dublin Core Identifier element - resource ID.
@@ -472,7 +428,7 @@ class DexterityContent(Persistent, Contained):
 
     def Rights(self):
         # Dublin Core Rights element - resource copyright.
-        return safe_utf8(self.rights)
+        return self.rights
 
     # ICatalogableDublinCore
 
@@ -480,7 +436,6 @@ class DexterityContent(Persistent, Contained):
         # Dublin Core Date element - date resource created.
         # allow for non-existent creation_date, existed always
         date = getattr(self, 'creation_date', None)
-        date = datify(date)
         return date is None and FLOOR_DATE or date
 
     def effective(self):
@@ -488,13 +443,11 @@ class DexterityContent(Persistent, Contained):
         date = getattr(self, 'effective_date', _marker)
         if date is _marker:
             date = getattr(self, 'creation_date', None)
-        date = datify(date)
         return date is None and FLOOR_DATE or date
 
     def expires(self):
         # Dublin Core Date element - date resource expires.
         date = getattr(self, 'expiration_date', None)
-        date = datify(date)
         return date is None and CEILING_DATE or date
 
     def modified(self):
@@ -504,7 +457,6 @@ class DexterityContent(Persistent, Contained):
             # Upgrade.
             date = datetime.fromtimestamp(self._p_mtime)
             self.modification_date = date
-        date = datify(date)
         return date
 
     def isEffective(self, date):
@@ -519,38 +471,38 @@ class DexterityContent(Persistent, Contained):
 
     def setTitle(self, title):
         # Set Dublin Core Title element - resource name.
-        self.title = safe_unicode(title)
+        self.title = safe_str(title)
 
     def setDescription(self, description):
         # Set Dublin Core Description element - resource summary.
-        self.description = safe_unicode(description)
+        self.description = safe_str(description)
 
     def setCreators(self, creators):
         # Set Dublin Core Creator elements - resource authors.
         if isinstance(creators, str):
             creators = [creators]
-        self.creators = tuple(safe_unicode(c.strip()) for c in creators)
+        self.creators = tuple(safe_str(c.strip()) for c in creators)
 
     def setSubject(self, subject):
         # Set Dublin Core Subject element - resource keywords.
         if isinstance(subject, str):
             subject = [subject]
-        self.subject = tuple(safe_unicode(s.strip()) for s in subject)
+        self.subject = tuple(safe_str(s.strip()) for s in subject)
 
     def setContributors(self, contributors):
         # Set Dublin Core Contributor elements - resource collaborators.
         if isinstance(contributors, str):
             contributors = contributors.split(';')
         self.contributors = tuple(
-            safe_unicode(c.strip()) for c in contributors)
+                safe_str(c.strip()) for c in contributors)
 
     def setEffectiveDate(self, effective_date):
         # Set Dublin Core Date element - date resource becomes effective.
-        self.effective_date = datify(effective_date)
+        self.effective_date = effective_date
 
     def setExpirationDate(self, expiration_date):
         # Set Dublin Core Date element - date resource expires.
-        self.expiration_date = datify(expiration_date)
+        self.expiration_date = expiration_date
 
     def setFormat(self, format):
         # Set Dublin Core Format element - resource format.
@@ -562,7 +514,7 @@ class DexterityContent(Persistent, Contained):
 
     def setRights(self, rights):
         # Set Dublin Core Rights element - resource copyright.
-        self.rights = safe_unicode(rights)
+        self.rights = safe_str(rights)
 
 
 @implementer(IDexterityItem)
@@ -572,13 +524,6 @@ class Item(DexterityContent):
 
     __providedBy__ = FTIAwareSpecification()
     __allow_access_to_unprotected_subobjects__ = AttributeValidator()
-
-    isPrincipiaFolderish = 0
-
-    manage_options = ({
-        'label': 'View',
-        'action': 'view',
-    },)
 
     # Be explicit about which __getattr__ to use
     __getattr__ = DexterityContent.__getattr__
@@ -591,8 +536,6 @@ class Container(OrderedContainer, DexterityContent):
 
     __providedBy__ = FTIAwareSpecification()
     __allow_access_to_unprotected_subobjects__ = AttributeValidator()
-
-    isPrincipiaFolderish = 1
 
     # Make sure PortalFolder's accessors and mutators don't take precedence
     Title = DexterityContent.Title
@@ -608,68 +551,10 @@ class Container(OrderedContainer, DexterityContent):
         try:
             return DexterityContent.__getattr__(self, name)
         except AttributeError:
-            pass
-
-        # Be specific about the implementation we use
-        return OrderedContainer.get(self, name)
-
-    def manage_delObjects(self, ids=None, REQUEST=None):
-        """Delete the contained objects with the specified ids.
-
-        If the current user does not have permission to delete one of the
-        objects, an Unauthorized exception will be raised.
-        """
-        if ids is None:
-            ids = []
-        if isinstance(ids, basestring):
-            ids = [ids]
-        for id in ids:
-            item = self._getOb(id)
-            if not zopepolicy.ZopeSecurityPolicy().checkPermission(
-                'plone.DeleteObjects', item):
-                raise Unauthorized(
-                    "Do not have permissions to remove this object"
-                )
-        return super(Container, self).manage_delObjects(ids, REQUEST=REQUEST)
-
-    # override PortalFolder's allowedContentTypes to respect IConstrainTypes
-    # adapters
-    def allowedContentTypes(self, context=None):
-        if not context:
-            context = self
-
-        constrains = IConstrainTypes(context, None)
-        if not constrains:
-            return super(Container, self).allowedContentTypes()
-
-        return constrains.allowedContentTypes()
-
-    # override PortalFolder's invokeFactory to respect IConstrainTypes
-    # adapters
-    def invokeFactory(self, type_name, id, RESPONSE=None, *args, **kw):
-        """Invokes the portal_types tool
-        """
-        constrains = IConstrainTypes(self, None)
-
-        if constrains:
-            # Do permission check before constrain checking so we'll get
-            # an Unauthorized over a ValueError.
-            fti = queryUtility(ITypeInformation, name=type_name)
-            if fti is not None and not fti.isConstructionAllowed(self):
-                raise Unauthorized('Cannot create %s' % fti.getId())
-
-            allowed_ids = [
-                fti.getId() for fti in constrains.allowedContentTypes()
-            ]
-            if type_name not in allowed_ids:
-                raise ValueError(
-                    'Subobject type disallowed by IConstrainTypes adapter: %s'
-                    % type_name
-                )
-
-        return super(Container, self).invokeFactory(
-            type_name, id, RESPONSE, *args, **kw
-        )
+            value = OrderedContainer.get(self, name, _marker)
+            if value is _marker:
+                raise
+            return value
 
 
 def reindexOnModify(content, event):

@@ -3,11 +3,7 @@ from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.interfaces import IFormFieldProvider
 from plone.dexterity.schema import SCHEMA_CACHE
-from plone.dexterity.schema import SchemaNameEncoder  # noqa bbb
-from plone.dexterity.schema import schemaNameToPortalType  # noqa bbb
-from plone.dexterity.schema import splitSchemaName  # noqa bbb
 from plone.supermodel.utils import mergedTaggedValueDict
-from plone.uuid.interfaces import IUUID
 from zope.component import createObject
 from zope.component import getUtility
 from zope.container.interfaces import INameChooser
@@ -15,10 +11,7 @@ from zope.dottedname.resolve import resolve
 from zope.event import notify
 from zope.lifecycleevent import ObjectCreatedEvent
 from zope.security.interfaces import Unauthorized
-
-import datetime
 import logging
-
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +29,7 @@ def resolveDottedName(dottedName):
 
 
 def iterSchemataForType(portal_type):
-    """XXX: came from plone.app.deco.utils, very similar to iterSchemata
+    """XXX: came from p.a.deco.utils, very similar to iterSchemata  # noqa
 
     Not fully merged codewise with iterSchemata as that breaks
     test_webdav.test_readline_mimetype_additional_schemata.
@@ -71,7 +64,7 @@ def getAdditionalSchemata(context=None, portal_type=None):
     are set, the portal_type might get ignored, depending on which
     code path is taken.
     """
-    log.debug("getAdditionalSchemata with context %r and portal_type %s",
+    log.debug('getAdditionalSchemata with context %r and portal_type %s',
               context, portal_type)
     if context is None and portal_type is None:
         return
@@ -80,7 +73,7 @@ def getAdditionalSchemata(context=None, portal_type=None):
     else:
         behavior_assignable = None
     if behavior_assignable is None:
-        log.debug("No behavior assignable found, only checking fti.")
+        log.debug('No behavior assignable found, only checking fti.')
         # Usually an add-form.
         if portal_type is None:
             portal_type = context.portal_type
@@ -91,7 +84,7 @@ def getAdditionalSchemata(context=None, portal_type=None):
             if form_schema is not None:
                 yield form_schema
     else:
-        log.debug("Behavior assignable found for context.")
+        log.debug('Behavior assignable found for context.')
         for behavior_reg in behavior_assignable.enumerateBehaviors():
             form_schema = IFormFieldProvider(behavior_reg.interface, None)
             if form_schema is not None:
@@ -140,33 +133,32 @@ def addContentToContainer(container, object, checkConstraints=True):
     is False no check for addable content types is done. The new object,
     wrapped in its new acquisition context, is returned.
     """
-    if not hasattr(aq_base(object), "portal_type"):
-        raise ValueError("object must have its portal_type set")
+    try:
+        assert object.portal_type is not None
+    except (AssertionError, AttributeError):
+        raise ValueError('object must have its portal_type set')
 
-    container = aq_inner(container)
     if checkConstraints:
         container_fti = container.getTypeInfo()
 
         fti = getUtility(IDexterityFTI, name=object.portal_type)
         if not fti.isConstructionAllowed(container):
-            raise Unauthorized("Cannot create %s" % object.portal_type)
+            raise Unauthorized(
+                'Cannot create {0:s}'.format(object.portal_type))
 
         if container_fti is not None \
            and not container_fti.allowType(object.portal_type):
             raise ValueError(
-                "Disallowed subobject type: %s" % object.portal_type
+                'Disallowed subobject type: {0:s}'.format(
+                    object.portal_type)
             )
 
-    name = getattr(aq_base(object), 'id', None)
+    name = getattr(object, 'id', None)
     name = INameChooser(container).chooseName(name, object)
     object.id = name
 
     newName = container._setObject(name, object)
-    try:
-        return container._getOb(newName)
-    except AttributeError:
-        uuid = IUUID(object)
-        return uuidToObject(uuid)
+    return container._getOb(newName)
 
 
 def createContentInContainer(container, portal_type, checkConstraints=True,
@@ -179,33 +171,16 @@ def createContentInContainer(container, portal_type, checkConstraints=True,
     )
 
 
-def safe_utf8(st):
-    if isinstance(st, unicode):
+def safe_bytes(st):
+    if isinstance(st, str):
         st = st.encode('utf8')
     return st
 
 
-def safe_unicode(st):
-    if isinstance(st, str):
+def safe_str(st):
+    if isinstance(st, bytes):
         st = st.decode('utf8')
     return st
-
-
-def datify(in_date):
-    """Get a DateTime object from a string (or anything parsable by DateTime,
-       a datetime.date, a datetime.datetime
-    """
-    if isinstance(in_date, DateTime):
-        return in_date
-    if in_date == 'None':
-        in_date = None
-    elif isinstance(in_date, datetime.datetime):
-        in_date = DateTime(in_date)
-    elif isinstance(in_date, datetime.date):
-        in_date = DateTime(in_date.year, in_date.month, in_date.day)
-    elif in_date is not None:
-        in_date = DateTime(in_date)
-    return in_date
 
 
 def all_merged_tagged_values_dict(ifaces, key):

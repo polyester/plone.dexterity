@@ -8,10 +8,10 @@ class ITestSchema(Interface):
     """Schema used for testing
     """
 
-    title = schema.TextLine(title=u"Title",
-                            description=u"Administrative title")
+    title = schema.TextLine(title='Title',
+                            description='Administrative title')
 
-    description = schema.Text(title=u"Description",
+    description = schema.Text(title='Description',
                               required=False)
 
 

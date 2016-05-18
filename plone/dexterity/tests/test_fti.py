@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from Products.CMFCore.interfaces import ISiteRoot
 from plone.dexterity import utils
 from plone.dexterity.factory import DexterityFactory
 from plone.dexterity.fti import DexterityFTI
@@ -15,7 +14,8 @@ from plone.mocktestcase import MockTestCase
 from plone.supermodel.model import Model
 from zope.component import getGlobalSiteManager
 from zope.component import queryUtility
-from zope.component.hooks import setSite, setHooks
+from zope.component.hooks import setHooks
+from zope.component.hooks import setSite
 from zope.component.interfaces import IFactory
 from zope.component.persistentregistry import PersistentComponents
 from zope.container.contained import ObjectAddedEvent
@@ -34,11 +34,11 @@ import zope.schema
 
 
 class TestClass(object):
-    meta_type = "Test Class"
+    meta_type = 'Test Class'
 
 
 class TestClass2(object):
-    meta_type = "Test Class 2"
+    meta_type = 'Test Class 2'
 
 
 class ITestInterface(Interface):
@@ -48,30 +48,30 @@ class ITestInterface(Interface):
 class TestFTI(MockTestCase):
 
     def test_factory_name_is_fti_id(self):
-        fti = DexterityFTI(u"testtype")
-        self.assertEqual(u"testtype", fti.getId())
-        self.assertEqual(u"testtype", fti.factory)
+        fti = DexterityFTI('testtype')
+        self.assertEqual('testtype', fti.getId())
+        self.assertEqual('testtype', fti.factory)
 
     def test_hasDynamicSchema(self):
-        fti = DexterityFTI(u"testtype")
-        fti.schema = u"dummy.schema"
+        fti = DexterityFTI('testtype')
+        fti.schema = 'dummy.schema'
         self.assertEqual(False, fti.hasDynamicSchema)
         fti.schema = None
         self.assertEqual(True, fti.hasDynamicSchema)
 
     def test_lookupSchema_with_concrete_schema(self):
-        fti = DexterityFTI(u"testtype")
-        fti.schema = u"plone.dexterity.tests.schemata.ITestSchema"
+        fti = DexterityFTI('testtype')
+        fti.schema = 'plone.dexterity.tests.schemata.ITestSchema'
         self.assertEqual(ITestSchema, fti.lookupSchema())
         # second time uses _v attribute
         self.assertEqual(ITestSchema, fti.lookupSchema())
 
     def test_lookupSchema_with_dynamic_schema(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None  # use dynamic schema
 
         portal = self.create_dummy(getPhysicalPath=lambda: ('', 'site'))
-        self.mock_utility(portal, ISiteRoot)
+        self.mock_utility(portal, Interface)
 
         schemaName = utils.portalTypeToSchemaName(fti.getId())
         setattr(plone.dexterity.schema.generated, schemaName, ITestSchema)
@@ -82,29 +82,29 @@ class TestFTI(MockTestCase):
         delattr(plone.dexterity.schema.generated, schemaName)
 
     def test_lookupSchema_with_nonexistant_schema(self):
-        """ Tests the case where a dexterity type is not removed cleanly
+        ''' Tests the case where a dexterity type is not removed cleanly
         from the fti, but the code has been removed.
-        """
-        fti = DexterityFTI(u"testtype")
+        '''
+        fti = DexterityFTI('testtype')
         fti.schema = 'model.wont.be.imported'
         portal = self.create_dummy(getPhysicalPath=lambda: ('', 'site'))
-        self.mock_utility(portal, ISiteRoot)
+        self.mock_utility(portal, Interface)
         schemaName = utils.portalTypeToSchemaName(fti.getId())
         setattr(plone.dexterity.schema.generated, schemaName, ITestSchema)
         self.assertEqual(ITestSchema, fti.lookupSchema())
         delattr(plone.dexterity.schema.generated, schemaName)
 
     def test_lookupModel_from_string(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
-        fti.model_source = "<model />"
+        fti.model_source = '<model />'
         fti.model_file = None
 
         model_dummy = Model()
 
-        loadString_mock = self.mocker.replace("plone.supermodel.loadString")
+        loadString_mock = self.mocker.replace('plone.supermodel.loadString')
         self.expect(
-            loadString_mock(fti.model_source, policy=u"dexterity")
+            loadString_mock(fti.model_source, policy='dexterity')
         ).result(model_dummy)
 
         self.replay()
@@ -114,22 +114,22 @@ class TestFTI(MockTestCase):
 
     def test_lookupModel_from_file_with_package(self):
 
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
         fti.model_source = None
-        fti.model_file = u"plone.dexterity.tests:test.xml"
+        fti.model_file = 'plone.dexterity.tests:test.xml'
 
         model_dummy = Model()
 
         import plone.dexterity.tests
         abs_file = os.path.join(
             os.path.split(plone.dexterity.tests.__file__)[0],
-            "test.xml"
+            'test.xml'
         )
 
-        loadFile_mock = self.mocker.replace("plone.supermodel.loadFile")
+        loadFile_mock = self.mocker.replace('plone.supermodel.loadFile')
         self.expect(
-            loadFile_mock(abs_file, reload=True, policy=u"dexterity")
+            loadFile_mock(abs_file, reload=True, policy='dexterity')
         ).result(model_dummy)
 
         self.replay()
@@ -142,19 +142,19 @@ class TestFTI(MockTestCase):
         import plone.dexterity.tests
         abs_file = os.path.join(
             os.path.split(plone.dexterity.tests.__file__)[0],
-            "test.xml"
+            'test.xml'
         )
 
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
         fti.model_source = None
         fti.model_file = abs_file
 
         model_dummy = Model()
 
-        loadFile_mock = self.mocker.replace("plone.supermodel.loadFile")
+        loadFile_mock = self.mocker.replace('plone.supermodel.loadFile')
         self.expect(
-            loadFile_mock(abs_file, reload=True, policy=u"dexterity")
+            loadFile_mock(abs_file, reload=True, policy='dexterity')
         ).result(model_dummy)
 
         self.replay()
@@ -164,22 +164,22 @@ class TestFTI(MockTestCase):
 
     def test_lookupModel_from_file_with_win32_absolute_path(self):
 
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
         fti.model_source = None
-        fti.model_file = r"C:\models\testmodel.xml"
+        fti.model_file = r'C:\models\testmodel.xml'
 
         model_dummy = Model()
 
-        isabs_mock = self.mocker.replace("os.path.isabs")
+        isabs_mock = self.mocker.replace('os.path.isabs')
         self.expect(isabs_mock(fti.model_file)).result(True)
 
-        isfile_mock = self.mocker.replace("os.path.isfile")
+        isfile_mock = self.mocker.replace('os.path.isfile')
         self.expect(isfile_mock(fti.model_file)).result(True)
 
-        loadFile_mock = self.mocker.replace("plone.supermodel.loadFile")
+        loadFile_mock = self.mocker.replace('plone.supermodel.loadFile')
         self.expect(
-            loadFile_mock(fti.model_file, reload=True, policy=u"dexterity")
+            loadFile_mock(fti.model_file, reload=True, policy='dexterity')
         ).result(model_dummy)
 
         self.replay()
@@ -188,8 +188,8 @@ class TestFTI(MockTestCase):
         self.assertIs(model_dummy, model)
 
     def test_lookupModel_with_schema_only(self):
-        fti = DexterityFTI(u"testtype")
-        fti.schema = u"plone.dexterity.tests.schemata.ITestSchema"
+        fti = DexterityFTI('testtype')
+        fti.schema = 'plone.dexterity.tests.schemata.ITestSchema'
         fti.model_source = None
         fti.model_file = None
 
@@ -198,17 +198,17 @@ class TestFTI(MockTestCase):
         self.assertEqual(ITestSchema, model.schema)
 
     def test_lookupModel_from_string_with_schema(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         # effectively ignored:
-        fti.schema = u"plone.dexterity.tests.schemata.ITestSchema"
-        fti.model_source = "<model />"
+        fti.schema = 'plone.dexterity.tests.schemata.ITestSchema'
+        fti.model_source = '<model />'
         fti.model_file = None
 
         model_dummy = Model()
 
-        loadString_mock = self.mocker.replace("plone.supermodel.loadString")
+        loadString_mock = self.mocker.replace('plone.supermodel.loadString')
         self.expect(
-            loadString_mock(fti.model_source, policy=u"dexterity")
+            loadString_mock(fti.model_source, policy='dexterity')
         ).result(model_dummy)
 
         self.replay()
@@ -218,7 +218,7 @@ class TestFTI(MockTestCase):
         self.assertIs(ITestSchema, fti.lookupSchema())
 
     def test_lookupModel_failure(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
         fti.model_source = None
         fti.model_file = None
@@ -226,31 +226,31 @@ class TestFTI(MockTestCase):
         self.assertRaises(ValueError, fti.lookupModel)
 
     def test_fires_modified_event_on_update_property_if_changed(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
 
-        fti.title = u"Old title"
+        fti.title = 'Old title'
         fti.global_allow = False
 
         notify_mock = self.mocker.replace('zope.event.notify')
         self.expect(
             notify_mock(
                 mocker.MATCH(
-                    lambda x: IObjectModifiedEvent.providedBy(x)
-                    and len(x.descriptions) == 1
-                    and x.descriptions[0].attribute == 'title'
-                    and x.descriptions[0].oldValue == "Old title"
+                    lambda x: IObjectModifiedEvent.providedBy(x) and
+                    len(x.descriptions) == 1 and
+                    x.descriptions[0].attribute == 'title' and
+                    x.descriptions[0].oldValue == 'Old title'
                 )
             )
         )
 
         self.replay()
 
-        fti._updateProperty('title', "New title")  # fires event caught above
+        fti._updateProperty('title', 'New title')  # fires event caught above
         fti._updateProperty('allow_discussion', False)  # does not fire
 
     def test_fires_modified_event_on_change_props_per_changed_property(self):
-        fti = DexterityFTI(u"testtype")
-        fti.title = "Old title"
+        fti = DexterityFTI('testtype')
+        fti.title = 'Old title'
         fti.allow_discussion = False
         fti.global_allow = True
 
@@ -258,10 +258,10 @@ class TestFTI(MockTestCase):
         self.expect(
             notify_mock(
                 mocker.MATCH(
-                    lambda x: IObjectModifiedEvent.providedBy(x)
-                    and len(x.descriptions) == 1
-                    and x.descriptions[0].attribute == 'title'
-                    and x.descriptions[0].oldValue == "Old title"
+                    lambda x: IObjectModifiedEvent.providedBy(x) and
+                    len(x.descriptions) == 1 and
+                    x.descriptions[0].attribute == 'title' and
+                    x.descriptions[0].oldValue == 'Old title'
                 )
             )
         )
@@ -269,24 +269,24 @@ class TestFTI(MockTestCase):
         self.expect(
             notify_mock(
                 mocker.MATCH(
-                    lambda x: IObjectModifiedEvent.providedBy(x)
-                    and len(x.descriptions) == 1
-                    and x.descriptions[0].attribute == 'global_allow'
-                    and x.descriptions[0].oldValue is True
+                    lambda x: IObjectModifiedEvent.providedBy(x) and
+                    len(x.descriptions) == 1 and
+                    x.descriptions[0].attribute == 'global_allow' and
+                    x.descriptions[0].oldValue is True
                 )
             )
         )
         self.replay()
 
         fti.manage_changeProperties(
-            title="New title",
+            title='New title',
             allow_discussion=False,
             global_allow=False
         )
 
     def test_checks_permission_in_is_construction_allowed_true(self):
-        fti = DexterityFTI(u"testtype")
-        fti.add_permission = "demo.Permission"
+        fti = DexterityFTI('testtype')
+        fti.add_permission = 'demo.Permission'
         container_dummy = self.create_dummy()
 
         permission_dummy = self.create_dummy()
@@ -296,13 +296,13 @@ class TestFTI(MockTestCase):
         self.mock_utility(
             permission_dummy,
             IPermission,
-            name=u"demo.Permission"
+            name='demo.Permission'
         )
 
         security_manager_mock = self.mocker.mock()
         self.expect(
-            security_manager_mock.checkPermission(
-                "Some add permission",
+            security_manager_mock.checkPermission(  # noqa
+                'Some add permission',
                 container_dummy)
         ).result(True)
 
@@ -316,8 +316,8 @@ class TestFTI(MockTestCase):
         self.assertEqual(True, fti.isConstructionAllowed(container_dummy))
 
     def test_checks_permission_in_is_construction_allowed_false(self):
-        fti = DexterityFTI(u"testtype")
-        fti.add_permission = "demo.Permission"
+        fti = DexterityFTI('testtype')
+        fti.add_permission = 'demo.Permission'
         container_dummy = self.create_dummy()
 
         permission_dummy = self.create_dummy()
@@ -327,13 +327,13 @@ class TestFTI(MockTestCase):
         self.mock_utility(
             permission_dummy,
             IPermission,
-            name=u"demo.Permission"
+            name='demo.Permission'
         )
 
         security_manager_mock = self.mocker.mock()
         self.expect(
-            security_manager_mock.checkPermission(
-                "Some add permission",
+            security_manager_mock.checkPermission(  # noqa
+                'Some add permission',
                 container_dummy
             )
         ).result(False)
@@ -348,33 +348,33 @@ class TestFTI(MockTestCase):
         self.assertEqual(False, fti.isConstructionAllowed(container_dummy))
 
     def test_no_permission_utility_means_no_construction(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.add_permission = 'demo.Permission'  # not an IPermission utility
         container_dummy = self.create_dummy()
         self.assertEqual(False, fti.isConstructionAllowed(container_dummy))
 
     def test_no_permission_means_no_construction(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.add_permission = None
         container_dummy = self.create_dummy()
         self.assertEqual(False, fti.isConstructionAllowed(container_dummy))
 
     def test_add_view_url_set_on_creation(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         self.assertEqual(
             'string:${folder_url}/++add++testtype',
             fti.add_view_expr
         )
 
     def test_factory_set_on_creation(self):
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         self.assertEqual('testtype', fti.factory)
 
     def test_addview_and_factory_not_overridden_on_creation(self):
         fti = DexterityFTI(
-            u"testtype",
-            add_view_expr="string:${folder_url}/@@my-addview",
-            factory="my.factory"
+            'testtype',
+            add_view_expr='string:${folder_url}/@@my-addview',
+            factory='my.factory'
         )
         self.assertEqual(
             'string:${folder_url}/@@my-addview',
@@ -384,24 +384,24 @@ class TestFTI(MockTestCase):
 
     def test_meta_type(self):
         fti = DexterityFTI(
-            u"testtype",
-            klass="plone.dexterity.tests.test_fti.TestClass"
+            'testtype',
+            klass='plone.dexterity.tests.test_fti.TestClass'
         )
         self.assertEqual(TestClass.meta_type, fti.Metatype())
 
     def test_meta_type_change_class(self):
         fti = DexterityFTI(
-            u"testtype",
-            klass="plone.dexterity.tests.test_fti.TestClass"
+            'testtype',
+            klass='plone.dexterity.tests.test_fti.TestClass'
         )
         fti._updateProperty(
             'klass',
-            "plone.dexterity.tests.test_fti.TestClass2"
+            'plone.dexterity.tests.test_fti.TestClass2'
         )
         self.assertEqual(TestClass2.meta_type, fti.Metatype())
 
     def test_title_i18n(self):
-        fti = DexterityFTI(u'testtype', title='t\xc3\xa9st')
+        fti = DexterityFTI('testtype', title='t\xc3\xa9st')
 
         # with no i18n domain, we get the UTF8-encoded title
         self.assertEqual('t\xc3\xa9st', fti.Title())
@@ -409,11 +409,11 @@ class TestFTI(MockTestCase):
         # with an i18n domain, we get a Message
         fti.i18n_domain = 'test'
         msgid = fti.Title()
-        self.assertEqual(u't\xe9st', msgid)
+        self.assertEqual('t\xe9st', msgid)
         self.assertEqual('test', msgid.domain)
 
     def test_description_i18n(self):
-        fti = DexterityFTI(u'testtype', description='t\xc3\xa9st')
+        fti = DexterityFTI('testtype', description='t\xc3\xa9st')
 
         # with no i18n domain, we get the UTF8-encoded title
         self.assertEqual('t\xc3\xa9st', fti.Description())
@@ -421,7 +421,7 @@ class TestFTI(MockTestCase):
         # with an i18n domain, we get a Message
         fti.i18n_domain = 'test'
         msgid = fti.Description()
-        self.assertEqual(u't\xe9st', msgid)
+        self.assertEqual('t\xe9st', msgid)
         self.assertEqual('test', msgid.domain)
 
     def test_lookupModel_without_schema_policy(self):
@@ -429,13 +429,13 @@ class TestFTI(MockTestCase):
         gsm.registerUtility(
             DexteritySchemaPolicy(),
             plone.supermodel.interfaces.ISchemaPolicy,
-            name=u"dexterity"
+            name='dexterity'
         )
 
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
-        fti.model_source = '<model xmlns="http://namespaces.plone.org/'\
-                           'supermodel/schema"><schema/></model>'
+        fti.model_source = ('<model xmlns="http://namespaces.plone.org/'
+                            'supermodel/schema"><schema/></model>')
         fti.model_file = None
 
         model = fti.lookupModel()
@@ -444,22 +444,22 @@ class TestFTI(MockTestCase):
     def test_lookupModel_with_schema_policy(self):
         class TestSchemaPolicy(DexteritySchemaPolicy):
             def bases(self, schemaName, tree):
-                return (ITestInterface,)
+                return ITestInterface,
 
         gsm = getGlobalSiteManager()
         policy = TestSchemaPolicy()
         gsm.registerUtility(
             policy,
             plone.supermodel.interfaces.ISchemaPolicy,
-            name=u"test"
+            name='test'
         )
 
-        fti = DexterityFTI(u"testtype")
+        fti = DexterityFTI('testtype')
         fti.schema = None
-        fti.model_source = '<model xmlns="http://namespaces.plone.org/'\
-                           'supermodel/schema"><schema/></model>'
+        fti.model_source = ('<model xmlns="http://namespaces.plone.org/'
+                            'supermodel/schema"><schema/></model>')
         fti.model_file = None
-        fti.schema_policy = u"test"
+        fti.schema_policy = 'test'
 
         model = fti.lookupModel()
         self.assertEqual(True, ITestInterface in model.schemata[''].__bases__)
@@ -473,13 +473,13 @@ class TestFTIEvents(MockTestCase):
     # components really do get added/removed (using passthrough).
 
     def test_components_registered_on_add(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -503,8 +503,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 portal_type,
@@ -529,13 +529,13 @@ class TestFTIEvents(MockTestCase):
         self.assertNotEquals(None, queryUtility(IFactory, name=portal_type))
 
     def test_components_not_registered_on_add_if_exist(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -567,8 +567,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory, portal_type
             )
@@ -579,13 +579,13 @@ class TestFTIEvents(MockTestCase):
         ftiAdded(fti, ObjectAddedEvent(fti, container_dummy, fti.getId()))
 
     def test_components_unregistered_on_delete(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -631,13 +631,13 @@ class TestFTIEvents(MockTestCase):
         self.assertEqual(None, queryUtility(IFactory, name=portal_type))
 
     def test_components_unregistered_on_delete_does_not_error_with_no_components(self):  # noqa
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -660,13 +660,13 @@ class TestFTIEvents(MockTestCase):
         ftiRemoved(fti, ObjectRemovedEvent(fti, container_dummy, fti.getId()))
 
     def test_global_components_not_unregistered_on_delete(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -715,13 +715,13 @@ class TestFTIEvents(MockTestCase):
         self.assertNotEquals(None, queryUtility(IFactory, name=portal_type))
 
     def test_components_reregistered_on_rename(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -753,8 +753,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 portal_type,
@@ -776,7 +776,7 @@ class TestFTIEvents(MockTestCase):
                 container_dummy,
                 fti.getId(),
                 container_dummy,
-                u"newtype"
+                'newtype'
             )
         )
 
@@ -793,13 +793,13 @@ class TestFTIEvents(MockTestCase):
         self.assertNotEquals(None, queryUtility(IFactory, name=portal_type))
 
     def test_dynamic_schema_refreshed_on_modify_model_file(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = self.mocker.proxy(DexterityFTI(portal_type))
 
         class INew(Interface):
-            title = zope.schema.TextLine(title=u"title")
+            title = zope.schema.TextLine(title='title')
 
-        model_dummy = Model({u"": INew})
+        model_dummy = Model({'': INew})
 
         self.expect(fti.lookupModel()).result(model_dummy)
         self.create_dummy()
@@ -807,7 +807,7 @@ class TestFTIEvents(MockTestCase):
         site_dummy = self.create_dummy(
             getPhysicalPath=lambda: ('', 'siteid')
         )
-        self.mock_utility(site_dummy, ISiteRoot)
+        self.mock_utility(site_dummy, Interface)
 
         class IBlank(Interface):
             pass
@@ -828,16 +828,16 @@ class TestFTIEvents(MockTestCase):
         )
 
         self.assertTrue('title' in IBlank)
-        self.assertTrue(IBlank['title'].title == u"title")
+        self.assertTrue(IBlank['title'].title == 'title')
 
     def test_dynamic_schema_refreshed_on_modify_model_source(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = self.mocker.proxy(DexterityFTI(portal_type))
 
         class INew(Interface):
-            title = zope.schema.TextLine(title=u"title")
+            title = zope.schema.TextLine(title='title')
 
-        model_dummy = Model({u"": INew})
+        model_dummy = Model({'': INew})
 
         self.expect(fti.lookupModel()).result(model_dummy)
         self.create_dummy()
@@ -845,7 +845,7 @@ class TestFTIEvents(MockTestCase):
         site_dummy = self.create_dummy(
             getPhysicalPath=lambda: ('', 'siteid')
         )
-        self.mock_utility(site_dummy, ISiteRoot)
+        self.mock_utility(site_dummy, Interface)
 
         class IBlank(Interface):
             pass
@@ -866,14 +866,14 @@ class TestFTIEvents(MockTestCase):
         )
 
         self.assertTrue('title' in IBlank)
-        self.assertTrue(IBlank['title'].title == u"title")
+        self.assertTrue(IBlank['title'].title == 'title')
 
     def test_dynamic_schema_refreshed_on_modify_schema_policy(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = self.mocker.proxy(DexterityFTI(portal_type))
 
         class INew(Interface):
-            title = zope.schema.TextLine(title=u"title")
+            title = zope.schema.TextLine(title='title')
 
         class IBlank(Interface):
             pass
@@ -887,7 +887,7 @@ class TestFTIEvents(MockTestCase):
         gsm.registerUtility(
             policy,
             plone.supermodel.interfaces.ISchemaPolicy,
-            name=u"test"
+            name='test'
         )
 
         self.expect(fti.schema_policy).passthrough().count(0, None)
@@ -895,7 +895,7 @@ class TestFTIEvents(MockTestCase):
         site_dummy = self.create_dummy(
             getPhysicalPath=lambda: ('', 'siteid')
         )
-        self.mock_utility(site_dummy, ISiteRoot)
+        self.mock_utility(site_dummy, Interface)
 
         self.replay()
 
@@ -907,7 +907,7 @@ class TestFTIEvents(MockTestCase):
         self.assertNotIn('title', original)
 
         # Set new schema_policy
-        fti.schema_policy = "test"
+        fti.schema_policy = 'test'
 
         # Sync this with schema
         ftiModified(
@@ -922,23 +922,23 @@ class TestFTIEvents(MockTestCase):
         self.assertIn(INew, updated.__bases__)
 
     def test_concrete_schema_not_refreshed_on_modify_schema(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = self.mocker.proxy(DexterityFTI(portal_type))
 
         class IBlank(Interface):
             pass
 
         class INew(Interface):
-            title = zope.schema.TextLine(title=u"title")
+            title = zope.schema.TextLine(title='title')
 
-        model_dummy = Model({u"": INew})
+        model_dummy = Model({'': INew})
         self.expect(fti.lookupModel()).result(model_dummy).count(0, None)
         self.create_dummy()
 
         site_dummy = self.create_dummy(
             getPhysicalPath=lambda: ('', 'siteid')
         )
-        self.mock_utility(site_dummy, ISiteRoot)
+        self.mock_utility(site_dummy, Interface)
 
         self.replay()
 
@@ -963,12 +963,12 @@ class TestFTIEvents(MockTestCase):
         self.assertFalse('title' in IBlank)
 
     def test_old_factory_unregistered_after_name_changed_if_dynamic(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -1001,8 +1001,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 'new-factory',
@@ -1021,12 +1021,12 @@ class TestFTIEvents(MockTestCase):
         )
 
     def test_new_factory_not_registered_after_name_changed_if_exists(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -1049,8 +1049,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 'new-factory',
@@ -1069,12 +1069,12 @@ class TestFTIEvents(MockTestCase):
         )
 
     def test_old_factory_not_unregistered_if_not_created_by_dexterity(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type)
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -1107,8 +1107,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 'new-factory',
@@ -1127,14 +1127,14 @@ class TestFTIEvents(MockTestCase):
         )
 
     def test_renamed_factory_not_unregistered_if_not_unique(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type, factory='common-factory')
-        portal_type2 = u"testtype2"
+        portal_type2 = 'testtype2'
         fti2 = DexterityFTI(portal_type2, factory='common-factory')
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -1181,8 +1181,8 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.registerUtility(
                 mocker.MATCH(
-                    lambda x: isinstance(x, DexterityFactory)
-                    and x.portal_type == portal_type
+                    lambda x: isinstance(x, DexterityFactory) and
+                    x.portal_type == portal_type
                 ),
                 IFactory,
                 'new-factory',
@@ -1204,15 +1204,15 @@ class TestFTIEvents(MockTestCase):
         )
 
     def test_deleted_factory_not_unregistered_if_not_unique(self):
-        portal_type = u"testtype"
+        portal_type = 'testtype'
         fti = DexterityFTI(portal_type, factory='common-factory')
-        portal_type2 = u"testtype2"
+        portal_type2 = 'testtype2'
         fti2 = DexterityFTI(portal_type2, factory='common-factory')
         container_dummy = self.create_dummy()
 
         # Mock the lookup of the site and the site manager at the site root
         dummy_site = self.create_dummy()
-        self.mock_utility(dummy_site, ISiteRoot)
+        self.mock_utility(dummy_site, Interface)
 
         site_manager_mock = self.mocker.proxy(
             PersistentComponents(bases=(getGlobalSiteManager(),))
@@ -1225,7 +1225,7 @@ class TestFTIEvents(MockTestCase):
         ).result(site_manager_mock).count(1, None)
 
         # Pretend two FTIs are registered, both using common-factory
-        # NB: Assuming that "testtype" was already removed when this gets
+        # NB: Assuming that 'testtype' was already removed when this gets
         #     called
         self.expect(
             site_manager_mock.registeredUtilities()
@@ -1255,7 +1255,7 @@ class TestFTIEvents(MockTestCase):
         self.expect(
             site_manager_mock.unregisterUtility(
                 provided=IDexterityFTI,
-                name=u"testtype"
+                name='testtype'
             )
         ).count(1)
 

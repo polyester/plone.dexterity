@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import sys
-from setuptools import setup
 from setuptools import find_packages
+from setuptools import setup
+
+import sys
 
 
 version = '2.4.2.dev0'
@@ -38,6 +39,8 @@ setup(
     install_requires=[
         'setuptools',
         'python-dateutil',
+        'plone.rfc822',
+        'plone.alterego',
         'plone.behavior>=1.0b5',
         'plone.supermodel>=1.0b2',
         'plone.synchronize',
@@ -57,11 +60,12 @@ setup(
         'zope.site',
         'zope.size',
         'zope.dublincore',
-        'ZODB',
+        'zope.i18nmessageid',
+        'ZODB', 'persistent',
     ],
     extras_require={
         'test': [
-            'plone.mocktestcase>=1.0b3',
+            'plone.mocktestcase',
             'plone.testing',
             'mock',
         ]

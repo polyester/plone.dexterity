@@ -1,23 +1,33 @@
 # -*- coding: utf-8 -*-
+from plone.alterego import dynamic
+from plone.alterego.interfaces import IDynamicObjectFactory
 from plone.behavior.interfaces import IBehavior
 from plone.behavior.registration import BehaviorRegistration
+from plone.dexterity.interfaces import IContentType
 from plone.dexterity.interfaces import IDexterityFTI
+from plone.dexterity.interfaces import IDexteritySchema
 from plone.dexterity.interfaces import ISchemaInvalidatedEvent
+from plone.supermodel.parser import ISchemaPolicy
+from plone.supermodel.utils import syncSchema
 from plone.synchronize import synchronized
 from threading import RLock
 from zope.component import adapter
 from zope.component import getAllUtilitiesRegisteredFor
-from zope.component import getUtility
 from zope.component import queryUtility
 from zope.dottedname.resolve import resolve
+from zope.interface import alsoProvides
 from zope.interface import implementer
+from zope.interface.interface import InterfaceClass
+
 import functools
 import logging
 import types
 
 log = logging.getLogger(__name__)
 
-transient = types.ModuleType("transient")
+# Dynamic modules
+generated = dynamic.create('plone.dexterity.schema.generated')
+transient = types.ModuleType('transient')
 
 _MARKER = dict()
 
@@ -42,7 +52,7 @@ def volatile(func):
         else:
             fti = queryUtility(IDexterityFTI, name=portal_type)
         if fti is not None and self.cache_enabled:
-            key = '_v_schema_%s' % func.__name__
+            key = '_v_schema_{0:s}'.format(func.__name__)
             cache = getattr(fti, key, _MARKER)
             if cache is not _MARKER:
                 mtime, value = cache
@@ -128,14 +138,14 @@ class SchemaCache(object):
                     schema_interface = resolve(behavior_name)
                 except (ValueError, ImportError):
                     log.error(
-                        "Error resolving behavior {0}".format(
+                        'Error resolving behavior {0}'.format(
                             behavior_name
                         )
                     )
                     continue
                 registration = BehaviorRegistration(
                     title=behavior_name,
-                    description="bbb fallback lookup",
+                    description='bbb fallback lookup',
                     interface=schema_interface,
                     marker=None,
                     factory=None
@@ -148,7 +158,7 @@ class SchemaCache(object):
     def subtypes(self, fti):
         """all registered marker interfaces of ftis behaviors
 
-        XXX: this one does not make much sense and should be deprecated
+        XXX: this one does not make much sense and should be deprecated  # noqa
         """
         if fti is None:
             return ()
@@ -260,6 +270,16 @@ class SchemaNameEncoder(object):
         return [self.decode(a) for a in s.split('_0_')]
 
 
+def portalTypeToSchemaName(portal_type, schema='', prefix=None):
+    """Return a canonical interface name for a generated schema interface.
+    """
+    if prefix is None:
+        prefix = '/'  # XXX: Previously type were prefixed by site id  # noqa
+
+    encoder = SchemaNameEncoder()
+    return encoder.join(prefix, portal_type, schema)
+
+
 def schemaNameToPortalType(schemaName):
     """Return a the portal_type part of a schema name
     """
@@ -273,8 +293,93 @@ def splitSchemaName(schemaName):
     encoder = SchemaNameEncoder()
     items = encoder.split(schemaName)
     if len(items) == 2:
-        return items[0], items[1], u""
+        return items[0], items[1], ''
     elif len(items) == 3:
         return items[0], items[1], items[2]
     else:
-        raise ValueError("Schema name %s is invalid" % schemaName)
+        raise ValueError('Schema name {0:s} is invalid'.format(schemaName))
+
+
+# Dynamic module factory
+@implementer(IDynamicObjectFactory)
+class SchemaModuleFactory(object):
+    """Create dynamic schema interfaces on the fly
+    """
+
+    lock = RLock()
+    _transient_SCHEMA_CACHE = {}
+
+    @synchronized(lock)
+    def __call__(self, name, module):
+        """Someone tried to load a dynamic interface that has not yet been
+        created yet. We will attempt to load it from the FTI if we can. If
+        the FTI doesn't exist, create a temporary marker interface that we
+        can fill later.
+
+        The goal here is to ensure that we create exactly one interface
+        instance for each name. If we can't find an FTI, we'll cache the
+        interface so that we don't get a new one with a different id later.
+        This cache is global, so we synchronise the method with a thread
+        lock.
+
+        Once we have a properly populated interface, we set it onto the
+        module using setattr(). This means that the factory will not be
+        invoked again.
+        """
+
+        try:
+            prefix, portal_type, schemaName = splitSchemaName(name)
+        except ValueError:
+            return None
+
+        if name in self._transient_SCHEMA_CACHE:
+            schema = self._transient_SCHEMA_CACHE[name]
+        else:
+            bases = ()
+
+            is_default_schema = not schemaName
+            if is_default_schema:
+                bases += (IDexteritySchema,)
+
+            schema = InterfaceClass(name, bases, __module__=module.__name__)
+
+            if is_default_schema:
+                alsoProvides(schema, IContentType)
+
+        fti = queryUtility(IDexterityFTI, name=portal_type)
+        if fti is None and name not in self._transient_SCHEMA_CACHE:
+            self._transient_SCHEMA_CACHE[name] = schema
+        elif fti is not None:
+            model = fti.lookupModel()
+            syncSchema(model.schemata[schemaName], schema, sync_bases=True)
+
+            # Save this schema in the module - this factory will not be
+            # called again for this name
+
+            if name in self._transient_SCHEMA_CACHE:
+                del self._transient_SCHEMA_CACHE[name]
+
+            setattr(module, name, schema)
+
+        return schema
+
+
+@implementer(ISchemaPolicy)
+class DexteritySchemaPolicy(object):
+    """Determines how and where imported dynamic interfaces are created.
+    Note that these schemata are never used directly. Rather, they are merged
+    into a schema with a proper name and module, either dynamically or
+    in code.
+    """
+
+    def module(self, schemaName, tree):
+        return 'plone.dexterity.schema.transient'
+
+    def bases(self, schemaName, tree):
+        return ()
+
+    def name(self, schemaName, tree):
+        # We use a temporary name whilst the interface is being generated;
+        # when it's first used, we know the portal_type and site, and can
+        # thus update it
+        return '__tmp__' + schemaName
