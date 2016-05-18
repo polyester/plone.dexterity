@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+from dateutil.tz import tzutc
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.interfaces import IFormFieldProvider
@@ -11,12 +13,21 @@ from zope.dottedname.resolve import resolve
 from zope.event import notify
 from zope.lifecycleevent import ObjectCreatedEvent
 from zope.security.interfaces import Unauthorized
+
 import logging
+import time
+
 
 log = logging.getLogger(__name__)
 
 # Not thread safe, but downside of a write conflict is very small
 _dottedCache = {}
+
+
+def utcnow():
+    """Construct a UTC datetime from time.time()."""
+    t = time.time()
+    return datetime._fromtimestamp(t, True, tzutc)
 
 
 def resolveDottedName(dottedName):

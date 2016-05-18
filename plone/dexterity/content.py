@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import datetime
 from dateutil.tz import tzlocal
+from dateutil.tz import tzutc
 from persistent import Persistent
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.dexterity.interfaces import IDexterityContainer
@@ -28,12 +29,17 @@ from zope.location.interfaces import IContained
 from zope.schema.interfaces import IContextAwareDefaultFactory
 from zope.security.interfaces import IPermission
 from zope.securitypolicy import zopepolicy
+from zope.traversing.browser.interfaces import IAbsoluteURL
 
 
 _marker = object()
 _zone = tzlocal()
-FLOOR_DATE = datetime(1970, 1, 1)  # always effective
-CEILING_DATE = datetime(2500, 1, 1)  # never expires
+_utc = tzutc()
+
+# always effective
+FLOOR_DATE = datetime(*datetime.min.timetuple()[:-2], tzutc())
+# never expires
+CEILING_DATE = datetime(*datetime.max.timetuple()[:-2], tzutc())
 
 
 def _default_from_schema(context, schema, fieldname):
@@ -203,7 +209,7 @@ class DexterityContent(Persistent, Contained):
 
         if id is not None:
             self.id = id
-        now = datetime.utcnow()
+        now = datetime.now(tz=_zone)
         self.creation_date = now
         self.modification_date = now
 
@@ -312,7 +318,7 @@ class DexterityContent(Persistent, Contained):
         When called without an argument, sets the date to now.
         """
         if modification_date is None:
-            self.modification_date = datetime.now()
+            self.modification_date = datetime.now(tz=_zone)
         else:
             self.modification_date = modification_date
 
@@ -420,7 +426,7 @@ class DexterityContent(Persistent, Contained):
 
     def Identifier(self):
         # Dublin Core Identifier element - resource ID.
-        return self.absolute_url()
+        return str(IAbsoluteURL(self, IUUID(self)))
 
     def Language(self):
         # Dublin Core Language element - resource language.
@@ -455,7 +461,7 @@ class DexterityContent(Persistent, Contained):
         date = self.modification_date
         if date is None:
             # Upgrade.
-            date = datetime.fromtimestamp(self._p_mtime)
+            date = datetime.fromtimestamp(self._p_mtime, tz=_zone)
             self.modification_date = date
         return date
 

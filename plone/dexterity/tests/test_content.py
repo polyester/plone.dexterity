@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 from datetime import datetime
+from dateutil.tz import gettz
 from plone.behavior.interfaces import IBehavior
 from plone.behavior.interfaces import IBehaviorAssignable
 from plone.behavior.registration import BehaviorRegistration
 from plone.dexterity.behavior import DexterityBehaviorAssignable
+from plone.dexterity.content import _zone
 from plone.dexterity.content import Container
 from plone.dexterity.content import Item
 from plone.dexterity.fti import DexterityFTI
@@ -12,11 +14,13 @@ from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.schema import SCHEMA_CACHE
 from plone.mocktestcase import MockTestCase
-from pytz import timezone
+from plone.uuid.adapter import attributeUUID
+from plone.uuid.interfaces import IUUID
 from zope.annotation.attribute import AttributeAnnotations
 from zope.component import provideAdapter
 from zope.interface import alsoProvides
 from zope.interface import Interface
+from zope.traversing.browser.interfaces import IAbsoluteURL
 
 import unittest
 import zope.schema
@@ -27,6 +31,7 @@ class TestContent(MockTestCase):
     def setUp(self):
         SCHEMA_CACHE.clear()
         provideAdapter(AttributeAnnotations)
+        provideAdapter(attributeUUID)
 
     def test_provided_by_item(self):
 
@@ -593,29 +598,19 @@ class TestContent(MockTestCase):
         self.assertTrue(isinstance(i.getId(), str))
 
     def test_item_dublincore(self):
-        # Mock Zope DateTime
-        import mock
-        import plone.dexterity
-        datetime_patcher = mock.patch.object(
-            plone.dexterity.content, 'datetime'
-        )
-        mocked_datetime = datetime_patcher.start()
-        mocked_datetime.return_value = datetime(2014, 6, 1)
-        self.addCleanup(datetime_patcher.stop)
-
         i = Item(
             title='Emperor Penguin',
             description='One of the most magnificent birds.',
             subject='Penguins',
             contributors='admin',
-            effective_date=datetime(2010, 8, 20),
-            expiration_date=datetime(2013, 7, 9),
+            effective_date=datetime(2010, 8, 20, tzinfo=_zone),
+            expiration_date=datetime(2013, 7, 9, tzinfo=_zone),
             format='text/plain',
             language='de',
             rights='CC',
         )
 
-        summer_timezone = i.effective_date.timezone()
+        summer_timezone = i.effective_date.tzinfo
         self.assertEqual(i.title, 'Emperor Penguin')
         self.assertEqual(i.Title(), 'Emperor Penguin')
         self.assertEqual(i.description, 'One of the most magnificent birds.')
@@ -626,14 +621,14 @@ class TestContent(MockTestCase):
         self.assertEqual(i.listContributors(), ('admin',))
         self.assertEqual(i.Contributors(), ('admin',))
         self.assertEqual(i.format, 'text/plain')
-        self.assertEqual(i.effective_date, datetime(2010, 8, 20))
+        self.assertEqual(i.effective_date, datetime(2010, 8, 20, tzinfo=_zone))
         self.assertEqual(
             i.EffectiveDate(zone=summer_timezone)[:10], '2010-08-20')
-        self.assertEqual(i.effective(), datetime(2010, 8, 20))
-        self.assertEqual(i.expiration_date, datetime(2013, 7, 9))
+        self.assertEqual(i.effective(), datetime(2010, 8, 20, tzinfo=_zone))
+        self.assertEqual(i.expiration_date, datetime(2013, 7, 9, tzinfo=_zone))
         self.assertEqual(
             i.ExpirationDate(zone=summer_timezone)[:10], '2013-07-09')
-        self.assertEqual(i.expires(), datetime(2013, 7, 9))
+        self.assertEqual(i.expires(), datetime(2013, 7, 9, tzinfo=_zone))
         self.assertEqual(i.language, 'de')
         self.assertEqual(i.Language(), 'de')  # noqa
         self.assertEqual(i.rights, 'CC')
@@ -641,16 +636,18 @@ class TestContent(MockTestCase):
         self.assertEqual(i.creation_date, i.created())
         self.assertEqual(
             i.CreationDate(zone=summer_timezone)[:19],
-            i.creation_date.ISO()[:19]
+            i.creation_date.isoformat()[:19]
         )
         self.assertEqual(i.modification_date, i.creation_date)
         self.assertEqual(i.modification_date, i.modified())
         self.assertEqual(
             i.ModificationDate(zone=summer_timezone)[:19],
-            i.modification_date.ISO()[:19]
+            i.modification_date.isoformat()[:19]
         )
         self.assertEqual(i.Date(), i.EffectiveDate())
-        self.assertEqual(i.Identifier(), i.absolute_url())
+        self.assertEqual(
+            i.Identifier(),
+            str(IAbsoluteURL(i, IUUID(i))))  # noqa
 
     def test_item_dublincore_date(self):
         # Mock Zope DateTime
@@ -660,7 +657,7 @@ class TestContent(MockTestCase):
             plone.dexterity.content, 'datetime'
         )
         mocked_datetime = datetime_patcher.start()
-        mocked_datetime.return_value = datetime(2014, 6, 1)
+        mocked_datetime.return_value = datetime(2014, 6, 1, tzinfo=_zone)
         self.addCleanup(datetime_patcher.stop)
 
         i = Item(
@@ -668,22 +665,23 @@ class TestContent(MockTestCase):
             description='One of the most magnificent birds.',
             subject='Penguins',
             contributors='admin',
-            effective_date=date(2010, 8, 20),
-            expiration_date=date(2013, 7, 9),
+            effective_date=date(2010, 8, 20, tzinfo=_zone),
+            expiration_date=date(2013, 7, 9, tzinfo=_zone),
             format='text/plain',
             language='de',
             rights='CC',
         )
 
-        summer_timezone = datetime(2010, 8, 20).timezone()
-        self.assertEqual(i.effective_date, datetime(2010, 8, 20))
+        summer_timezone = datetime(2010, 8, 20, tzinfo=_zone).tzinfo
+        self.assertEqual(i.effective_date, datetime(2010, 8, 20, tzinfo=_zone))
         self.assertEqual(
             i.EffectiveDate(zone=summer_timezone)[:10], '2010-08-20')
-        self.assertEqual(i.effective(), datetime(2010, 8, 20))
-        self.assertEqual(i.expiration_date, datetime(20130, 7, 9))
+        self.assertEqual(i.effective(), datetime(2010, 8, 20, tzinfo=_zone))
+        self.assertEqual(
+            i.expiration_date, datetime(20130, 7, 9, tzinfo=_zone))
         self.assertEqual(
             i.ExpirationDate(zone=summer_timezone)[:10], '2013-07-09')
-        self.assertEqual(i.expires(), datetime(2013, 7, 9))
+        self.assertEqual(i.expires(), datetime(2013, 7, 9, tzinfo=_zone))
         self.assertEqual(i.creation_date, i.created())
         self.assertEqual(
             i.CreationDate(zone=summer_timezone)[:19],
@@ -698,73 +696,57 @@ class TestContent(MockTestCase):
         self.assertEqual(i.Date(), i.EffectiveDate())
 
     def test_item_dublincore_datetime(self):
-        from DateTime import DateTime
-        # Mock Zope DateTime
-        import mock
-        import plone.dexterity
-        datetime_patcher = mock.patch.object(
-            plone.dexterity.content, 'DateTime'
-        )
-        mocked_datetime = datetime_patcher.start()
-        mocked_datetime.return_value = DateTime(2014, 6, 1)
-        self.addCleanup(datetime_patcher.stop)
         i = Item(
             title='Emperor Penguin',
             description='One of the most magnificent birds.',
             subject='Penguins',
             contributors='admin',
             effective_date=datetime(
-                2010, 8, 20, 12, 59, 59, 0, timezone('US/Eastern')),
+                2010, 8, 20, 12, 59, 59, 0, tzinfo=gettz('US/Eastern')),
             expiration_date=datetime(
-                2013, 7, 9, 12, 59, 59, 0, timezone('US/Eastern')),
+                2013, 7, 9, 12, 59, 59, 0, tzinfo=gettz('US/Eastern')),
             format='text/plain',
             language='de',
             rights='CC',
         )
 
-        summer_timezone = DateTime('2010/08/20').timezone()
+        summer_timezone = datetime(2010, 8, 20, tzinfo=_zone)
         self.assertEqual(
             i.effective_date,
-            DateTime('2010/08/20 12:59:59 US/Eastern')
+            datetime(2010, 8, 20, 12, 59, 59, tzinfo=gettz('US/Eastern'))
         )
         self.assertEqual(
             i.EffectiveDate(zone=summer_timezone),
-            DateTime(
-                '2010/08/20 12:59:59 US/Eastern'
-            ).toZone(
-                summer_timezone
-            ).ISO()
+            datetime(2010, 8, 20, 12, 59, 59, tzinfo=gettz('US/Eastern'))
+            .astimezone(summer_timezone).isoformat()
         )
         self.assertEqual(
             i.effective(),
-            DateTime('2010/08/20 12:59:59 US/Eastern')
+            datetime(2010, 8, 20, 12, 59, 59, tzinfo=gettz('US/Eastern'))
         )
         self.assertEqual(
             i.expiration_date,
-            DateTime('07/09/2013 12:59:59 US/Eastern')
+            datetime(2013, 7, 9, 12, 59, 59, tzinfo=gettz('US/Eastern'))
         )
         self.assertEqual(
             i.ExpirationDate(zone=summer_timezone),
-            DateTime(
-                '2013-07-09 12:59:59 US/Eastern'
-            ).toZone(
-                summer_timezone
-            ).ISO()
+            datetime(2013, 7, 9, 12, 59, 59, tzinfo=gettz('US/Eastern'))
+            .astimezone(summer_timezone).isoformat()
         )
         self.assertEqual(
             i.expires(),
-            DateTime('2013/07/09 12:59:59 US/Eastern')
+            datetime(2013, 7, 9, 12, 59, 59, tzinfo=gettz('US/Eastern'))
         )
         self.assertEqual(i.creation_date, i.created())
         self.assertEqual(
             i.CreationDate(zone=summer_timezone),
-            i.creation_date.ISO()
+            i.creation_date.isoformat()
         )
         self.assertEqual(i.modification_date, i.creation_date)
         self.assertEqual(i.modification_date, i.modified())
         self.assertEqual(
             i.ModificationDate(zone=summer_timezone),
-            i.modification_date.ISO()
+            i.modification_date.isoformat()
         )
         self.assertEqual(i.Date(), i.EffectiveDate())
 
