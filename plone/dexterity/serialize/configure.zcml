@@ -10,4 +10,15 @@
     <adapter factory=".content.SerializeToJson" />
     <adapter factory=".content.SerializeFolderToJson" />
 
+<!-- TODO:  <adapter factory=".content.DeserializeFromJson" />
+  <adapter factory=".fields.DefaultFieldDeserializer" />
+  <adapter factory=".fields.DatetimeFieldDeserializer" />
+  <adapter factory=".fields.CollectionFieldDeserializer" />
+  <adapter factory=".fields.DictFieldDeserializer" />
+  <adapter factory=".fields.TimeFieldDeserializer" />
+  <adapter factory=".fields.TimedeltaFieldDeserializer" />
+  <adapter factory=".fields.NamedFieldDeserializer" />
+  <adapter factory=".fields.RichTextFieldDeserializer" />
+ -->
+
 </configure>
