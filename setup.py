@@ -42,6 +42,7 @@ setup(
         'plone.rfc822',
         'plone.alterego',
         'plone.behavior>=1.0b5',
+        'plone.jsonserializer',
         'plone.supermodel>=1.0b2',
         'plone.synchronize',
         'plone.uuid',
