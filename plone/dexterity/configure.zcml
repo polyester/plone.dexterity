@@ -13,6 +13,7 @@
     <include package="plone.uuid" />
     <include package="zope.securitypolicy" />
     <include package="zope.dublincore" />
+    <include package=".serialize" />
 
     <permission
       id="plone.ModifyPortalContent"
