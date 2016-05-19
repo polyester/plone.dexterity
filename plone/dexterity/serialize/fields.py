@@ -85,7 +85,7 @@ class DefaultFieldDeserializer(object):
         self.request = request
 
     def __call__(self, value):
-        if not isinstance(value, unicode):
+        if not isinstance(value, str):
             return value
         return IFromUnicode(self.field).fromUnicode(value)
 
