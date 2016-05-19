@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 from plone.dexterity.interfaces import IDexterityContent
+from plone.jsonserializer.interfaces import IFieldDeserializer
 from plone.jsonserializer.interfaces import IFieldSerializer
 from plone.jsonserializer.serializer.converters import json_compatible
 # from plone.namedfile.interfaces import INamedField
 # from plone.namedfile.interfaces import INamedFileField
 # from plone.namedfile.interfaces import INamedImageField
 from plone.registry.interfaces import IRegistry
-from plone.restapi.interfaces import IFieldDeserializer
 from zope.component import adapter
 from zope.component import getMultiAdapter
 from zope.interface import implementer
