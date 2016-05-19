@@ -120,7 +120,7 @@ def createContent(portal_type, **kw):
         # keywords arguments and set it, if the behavior has the questioned
         # attribute.
         behavior = schema(content)
-        for name, value in fields.items():
+        for name, value in kw.items():
             try:
                 # hasattr swallows exceptions.
                 getattr(behavior, name)
