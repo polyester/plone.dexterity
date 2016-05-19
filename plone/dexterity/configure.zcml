@@ -9,6 +9,7 @@
 
     <include package="plone.behavior" />
     <include package="plone.supermodel" />
+    <include package="plone.supermodel" file="security.zcml" />
     <include package="plone.uuid" />
     <include package="zope.securitypolicy" />
     <include package="zope.dublincore" />
