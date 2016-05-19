@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from persistent import Persistent
+from zope.security.management import getSecurityPolicy
 from plone.dexterity import utils
 from plone.dexterity.factory import DexterityFactory
 from plone.dexterity.interfaces import IDexterityFTI
@@ -19,7 +20,6 @@ from zope.i18nmessageid import Message
 from zope.interface import implementer
 from zope.lifecycleevent import modified
 from zope.security.interfaces import IPermission
-from zope.securitypolicy import zopepolicy
 import logging
 import os.path
 import plone.dexterity.schema
@@ -319,7 +319,7 @@ class DexterityFTI(Persistent):
             return False
 
         return bool(
-            zopepolicy.ZopeSecurityPolicy().checkPermission(  # noqa
+            getSecurityPolicy()().checkPermission(  # noqa
                 permission.title, container)
         )
 

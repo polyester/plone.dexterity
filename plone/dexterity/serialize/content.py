@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from zope.security.management import getSecurityPolicy
+
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.utils import iterSchemata
@@ -81,7 +83,7 @@ class SerializeToJson(object):
             if permission is None:
                 self.permission_cache[permission_name] = True
             else:
-                sm = zopepolicy.ZopeSecurityPolicy()
+                sm = getSecurityPolicy()()
                 self.permission_cache[permission_name] = bool(
                     sm.checkPermission(permission.title, self.context))
         return self.permission_cache[permission_name]

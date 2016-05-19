@@ -1,36 +1,28 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
 from datetime import datetime
+from persistent import Persistent
 from dateutil.tz import tzlocal
 from dateutil.tz import tzutc
-from persistent import Persistent
 from plone.behavior.interfaces import IBehaviorAssignable
-from plone.dexterity.interfaces import IDexterityContainer
-from plone.dexterity.interfaces import IDexterityContent
-from plone.dexterity.interfaces import IDexterityItem
-from plone.dexterity.interfaces import READ_PERMISSIONS_KEY
-from plone.dexterity.schema import SCHEMA_CACHE
-from plone.dexterity.utils import all_merged_tagged_values_dict
-from plone.dexterity.utils import iterSchemata
-from plone.dexterity.utils import safe_str
-from plone.uuid.interfaces import IAttributeUUID
-from plone.uuid.interfaces import IUUID
 from zope.annotation import IAttributeAnnotatable
-from zope.component import queryUtility
 from zope.container.contained import Contained
 from zope.container.ordered import OrderedContainer
 from zope.dublincore.interfaces import IWriteZopeDublinCore
 from zope.interface import implementer
-from zope.interface.declarations import getObjectSpecification
-from zope.interface.declarations import implementedBy
 from zope.interface.declarations import Implements
 from zope.interface.declarations import ObjectSpecificationDescriptor
-from zope.location.interfaces import IContained
+from zope.interface.declarations import getObjectSpecification
+from zope.interface.declarations import implementedBy
 from zope.schema.interfaces import IContextAwareDefaultFactory
-from zope.security.interfaces import IPermission
-from zope.securitypolicy import zopepolicy
 from zope.traversing.browser.interfaces import IAbsoluteURL
-
+from plone.dexterity.interfaces import IDexterityContainer
+from plone.dexterity.interfaces import IDexterityContent
+from plone.dexterity.interfaces import IDexterityItem
+from plone.dexterity.schema import SCHEMA_CACHE
+from plone.dexterity.utils import safe_str
+from plone.uuid.interfaces import IAttributeUUID
+from plone.uuid.interfaces import IUUID
 
 _marker = object()
 _zone = tzlocal()
@@ -140,39 +132,6 @@ class FTIAwareSpecification(ObjectSpecificationDescriptor):
         return all_spec
 
 
-class AttributeValidator(object):
-    """Decide whether attributes should be accessible. This is set as the
-    __allow_access_to_unprotected_subobjects__ variable in Dexterity's content
-    classes.
-    """
-
-    def __call__(self, name, value):
-        # Short circuit for things like views or viewlets
-        if name == '':
-            return 1
-
-        context = IContained(self).__parent__
-
-        # we may want to cache this based on the combined mod-times
-        # of fti and context, but even this is not save in the case someone
-        # decides to have behaviors bound on something different than context
-        # or fti, i.e. schemas for subtrees.
-        protection_dict = all_merged_tagged_values_dict(
-                iterSchemata(context),
-                READ_PERMISSIONS_KEY
-        )
-
-        if name not in protection_dict:
-            return 1
-
-        permission = queryUtility(IPermission, name=protection_dict[name])
-        if permission is not None:
-            policy = zopepolicy.ZopeSecurityPolicy()
-            return policy.checkPermission(permission.title, context)
-
-        return 0
-
-
 @implementer(
     IDexterityContent,
     IAttributeAnnotatable,
@@ -184,7 +143,6 @@ class DexterityContent(Persistent, Contained):
     """
 
     __providedBy__ = FTIAwareSpecification()
-    __allow_access_to_unprotected_subobjects__ = AttributeValidator()
 
     # portal_type is set by the add view and/or factory
     portal_type = None
@@ -529,7 +487,6 @@ class Item(DexterityContent):
     """
 
     __providedBy__ = FTIAwareSpecification()
-    __allow_access_to_unprotected_subobjects__ = AttributeValidator()
 
     # Be explicit about which __getattr__ to use
     __getattr__ = DexterityContent.__getattr__
@@ -541,7 +498,6 @@ class Container(OrderedContainer, DexterityContent):
     """
 
     __providedBy__ = FTIAwareSpecification()
-    __allow_access_to_unprotected_subobjects__ = AttributeValidator()
 
     # Make sure PortalFolder's accessors and mutators don't take precedence
     Title = DexterityContent.Title
@@ -561,16 +517,3 @@ class Container(OrderedContainer, DexterityContent):
             if value is _marker:
                 raise
             return value
-
-
-def reindexOnModify(content, event):
-    """When an object is modified, re-index it in the catalog
-    """
-
-    if event.object is not content:
-        return
-
-    # NOTE: We are not using event.descriptions because the field names may
-    # not match index names.
-
-    # content.reindexObject()
