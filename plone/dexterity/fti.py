@@ -141,6 +141,12 @@ class DexterityFTI(Persistent):
     def __init__(self, id, *args, **kwargs):
         self.id = id
 
+        if 'schema' in kwargs:
+            self.schema = kwargs['schema']
+
+        if 'klass' in kwargs:
+            self.klass = kwargs['klass']
+
         # if 'aliases' not in kwargs:
         #     self.setMethodAliases(self.default_aliases)
 
