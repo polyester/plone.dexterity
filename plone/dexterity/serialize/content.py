@@ -11,6 +11,7 @@ from plone.jsonserializer.interfaces import IFieldSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
 from plone.jsonserializer.interfaces import ISerializeToJsonSummary
 from plone.jsonserializer.serializer.converters import json_compatible
+from plone.server.browser import get_physical_path
 from plone.supermodel.interfaces import READ_PERMISSIONS_KEY
 from plone.supermodel.interfaces import WRITE_PERMISSIONS_KEY
 from plone.supermodel.utils import mergedTaggedValueDict
@@ -48,7 +49,7 @@ class SerializeToJson(object):
             parent_summary = {}
         result = {
             # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
-            '@id': '',  # TODO: self.context.absolute_url(),
+            '@id': '/'.join(get_physical_path(self.context)),
             '@type': self.context.portal_type,
             'parent': parent_summary,
             'created': json_compatible(self.context.created),
