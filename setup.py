@@ -62,7 +62,8 @@ setup(
         'zope.size',
         'zope.dublincore',
         'zope.i18nmessageid',
-        'ZODB', 'persistent',
+        'ZODB',
+        'persistent',
     ],
     extras_require={
         'test': [

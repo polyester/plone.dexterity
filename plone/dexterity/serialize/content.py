@@ -1,33 +1,24 @@
 # -*- coding: utf-8 -*-
-from zope.security.management import getSecurityPolicy
-
+from zope.component import ComponentLookupError
+from zope.component import adapter
+from zope.component import getMultiAdapter
+from zope.component import queryMultiAdapter
+from zope.component import queryUtility
+from zope.interface import Interface
+from zope.interface import implementer
+from zope.schema import getFields
+from zope.security.interfaces import IPermission
+from zope.security.interfaces import IInteraction
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.utils import iterSchemata
-from plone.jsonserializer.deserializer import json_body
-from plone.jsonserializer.interfaces import IDeserializeFromJson
-from plone.jsonserializer.interfaces import IFieldDeserializer
 from plone.jsonserializer.interfaces import IFieldSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
 from plone.jsonserializer.interfaces import ISerializeToJsonSummary
 from plone.jsonserializer.serializer.converters import json_compatible
 from plone.server.browser import get_physical_path
 from plone.supermodel.interfaces import READ_PERMISSIONS_KEY
-from plone.supermodel.interfaces import WRITE_PERMISSIONS_KEY
 from plone.supermodel.utils import mergedTaggedValueDict
-from zope.component import adapter
-from zope.component import ComponentLookupError
-from zope.component import getMultiAdapter
-from zope.component import queryMultiAdapter
-from zope.component import queryUtility
-from zope.event import notify
-from zope.interface import implementer
-from zope.interface import Interface
-from zope.lifecycleevent import ObjectModifiedEvent
-from zope.schema import getFields
-from zope.schema.interfaces import ValidationError
-from zope.security.interfaces import IPermission
-from zope.securitypolicy import zopepolicy
 
 
 @implementer(ISerializeToJson)
@@ -84,9 +75,9 @@ class SerializeToJson(object):
             if permission is None:
                 self.permission_cache[permission_name] = True
             else:
-                sm = getSecurityPolicy()()
+                security = IInteraction(self.request)
                 self.permission_cache[permission_name] = bool(
-                    sm.checkPermission(permission.title, self.context))
+                    security.checkPermission(permission.title, self.context))
         return self.permission_cache[permission_name]
 
 
