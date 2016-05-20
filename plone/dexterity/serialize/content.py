@@ -1,16 +1,7 @@
 # -*- coding: utf-8 -*-
-from zope.component import ComponentLookupError
-from zope.component import adapter
-from zope.component import getMultiAdapter
-from zope.component import queryMultiAdapter
-from zope.component import queryUtility
-from zope.interface import Interface
-from zope.interface import implementer
-from zope.schema import getFields
-from zope.security.interfaces import IPermission
-from zope.security.interfaces import IInteraction
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
+from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.utils import iterSchemata
 from plone.jsonserializer.interfaces import IFieldSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
@@ -19,6 +10,16 @@ from plone.jsonserializer.serializer.converters import json_compatible
 from plone.server.browser import get_physical_path
 from plone.supermodel.interfaces import READ_PERMISSIONS_KEY
 from plone.supermodel.utils import mergedTaggedValueDict
+from zope.component import adapter
+from zope.component import ComponentLookupError
+from zope.component import getMultiAdapter
+from zope.component import queryMultiAdapter
+from zope.component import queryUtility
+from zope.interface import implementer
+from zope.interface import Interface
+from zope.schema import getFields
+from zope.security.interfaces import IInteraction
+from zope.security.interfaces import IPermission
 
 
 @implementer(ISerializeToJson)
@@ -38,6 +39,10 @@ class SerializeToJson(object):
                 (parent, self.request), ISerializeToJsonSummary)()
         except ComponentLookupError:
             parent_summary = {}
+
+        fti = queryUtility(IDexterityFTI, name=self.context.portal_type)
+        schema_summary = getMultiAdapter((fti, self.request), ISerializeToJson)()
+
         result = {
             # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
             '@id': '/'.join(get_physical_path(self.context)),
@@ -46,6 +51,7 @@ class SerializeToJson(object):
             'created': json_compatible(self.context.created),
             'modified': json_compatible(self.context.modified),
             'UID': self.context.UID(),
+            'schema': schema_summary
         }
 
         for schema in iterSchemata(self.context):
@@ -93,9 +99,31 @@ class SerializeFolderToJson(SerializeToJson):
         ]
         return result
 
+
+@implementer(ISerializeToJson)
+@adapter(IDexterityFTI, Interface)
+class SerializeFTIToJson(SerializeToJson):
+
+    def __call__(self):
+        fti = self.context
+
+        result = {
+            # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
+            '@id': fti.schema,
+            '@type': fti.klass or fti.schema,
+        }
+        return result
+
 # from z3c.form.interfaces import IDataManager
 # from z3c.form.interfaces import IManagerValidator
 # from zExceptions import BadRequest
+# from plone.jsonserializer.deserializer import json_body
+# from plone.jsonserializer.interfaces import IDeserializeFromJson
+# from plone.jsonserializer.interfaces import IFieldDeserializer
+# from plone.supermodel.interfaces import WRITE_PERMISSIONS_KEY
+# from zope.event import notify
+# from zope.lifecycleevent import ObjectModifiedEvent
+# from zope.schema.interfaces import ValidationError
 
 # @implementer(IDeserializeFromJson)
 # @adapter(IDexterityContent, Interface)

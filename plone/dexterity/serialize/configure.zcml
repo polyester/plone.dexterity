@@ -9,6 +9,7 @@
     <include package="plone.jsonserializer" />
     <adapter factory=".content.SerializeToJson" />
     <adapter factory=".content.SerializeFolderToJson" />
+    <adapter factory=".content.SerializeFTIToJson" />
     <adapter factory=".fields.DefaultFieldSerializer" />
 
 <!-- TODO:  <adapter factory=".content.DeserializeFromJson" />
