@@ -3,13 +3,19 @@ from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.interfaces import IDexterityFTI
 from plone.dexterity.utils import iterSchemata
+from plone.dexterity.utils import iterSchemataForType
+from plone.dexterity.utils import resolveDottedName
 from plone.jsonserializer.interfaces import IFieldSerializer
+from plone.jsonserializer.interfaces import IFieldsetSerializer
+from plone.jsonserializer.interfaces import ISchemaSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
 from plone.jsonserializer.interfaces import ISerializeToJsonSummary
 from plone.jsonserializer.serializer.converters import json_compatible
 from plone.server.browser import get_physical_path
+from plone.supermodel.interfaces import FIELDSETS_KEY
 from plone.supermodel.interfaces import READ_PERMISSIONS_KEY
 from plone.supermodel.utils import mergedTaggedValueDict
+from plone.supermodel.utils import sortedFields
 from zope.component import adapter
 from zope.component import ComponentLookupError
 from zope.component import getMultiAdapter
@@ -106,13 +112,56 @@ class SerializeFTIToJson(SerializeToJson):
 
     def __call__(self):
         fti = self.context
-
         result = {
             # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
-            '@id': fti.schema,
-            '@type': fti.klass or fti.schema,
+            'title': fti.id,
+            'type': 'object',
+            'properties': {
+                'fieldsets': {},
+                'schemas': {}
+            },
         }
+
+        for schema in iterSchemataForType(fti.id):
+
+            schema_serializer = getMultiAdapter(
+                (schema, fti, self.request), ISchemaSerializer)
+            result['properties']['schemas'][schema_serializer.name] = schema_serializer()
+
+            fieldsets = schema.queryTaggedValue(FIELDSETS_KEY, [])
+            fieldset_fields = set()
+            for fieldset in fieldsets:
+                fields = fieldset.fields
+                # Keep a list so we can figure out what doesn't belong
+                # to a fieldset
+                fieldset_fields.update(fields)
+
+                # Write the fieldset and any fields it contains
+                fieldset_serializer = getMultiAdapter(
+                    (fieldset, schema, fti, self.request), IFieldsetSerializer)
+                result['properties']['fieldsets'][fieldset_serializer.name] = fieldset_serializer()
+
+            # Handle any fields that aren't part of a fieldset
+            non_fieldset_fields = [name for name, field in sortedFields(schema)
+                                   if name not in fieldset_fields]
+
+            for fieldName in non_fieldset_fields:
+                field = schema[fieldName]
+                serializer = getMultiAdapter((field, schema, fti, self.request), IFieldSerializer)
+                result['properties'][fieldName] = serializer()
+
+
+            invariants = []
+            for i in schema.queryTaggedValue('invariants', []):
+                invariants.append("%s.%s" % (i.__module__, i.__name__))
+            result['properties']['invariants'] = invariants
+
         return result
+
+
+# @implementer(ISerializeToJson)
+# @adapter(IDexterityFTI, Interface)
+# class SerializeFTIToJson(SerializeToJson):
 
 # from z3c.form.interfaces import IDataManager
 # from z3c.form.interfaces import IManagerValidator

@@ -10,7 +10,12 @@
     <adapter factory=".content.SerializeToJson" />
     <adapter factory=".content.SerializeFolderToJson" />
     <adapter factory=".content.SerializeFTIToJson" />
+
+    <adapter factory=".fields.DefaultSchemaSerializer" />
+    <adapter factory=".fields.DefaultFieldsetSerializer" />
+
     <adapter factory=".fields.DefaultFieldSerializer" />
+    <adapter factory=".fields.DefaultFTIFieldSerializer" />
 
 <!-- TODO:  <adapter factory=".content.DeserializeFromJson" />
   <adapter factory=".fields.DefaultFieldDeserializer" />
