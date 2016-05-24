@@ -15,7 +15,8 @@ New:
 
 Fixes:
 
-- *add item here*
+- Fix error with createContent when two behaviors that implement the same field name
+  [vangheem]
 
 
 2.4.1 (2016-02-27)
