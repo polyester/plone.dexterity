@@ -128,7 +128,8 @@ def createContent(portal_type, **kw):
                 # fieldname not available
                 continue
             setattr(behavior, name, value)
-            del fields[name]
+            if name in fields:
+                del fields[name]
 
     for (key, value) in fields.items():
         setattr(content, key, value)
