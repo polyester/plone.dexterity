@@ -40,10 +40,13 @@ class SerializeToJson(object):
 
     def __call__(self):
         parent = self.context.__parent__
-        try:
-            parent_summary = getMultiAdapter(
-                (parent, self.request), ISerializeToJsonSummary)()
-        except ComponentLookupError:
+        if parent is not None:
+            try:
+                parent_summary = getMultiAdapter(
+                    (parent, self.request), ISerializeToJsonSummary)()
+            except ComponentLookupError:
+                parent_summary = {}
+        else:
             parent_summary = {}
 
         fti = queryUtility(IDexterityFTI, name=self.context.portal_type)
@@ -99,9 +102,12 @@ class SerializeFolderToJson(SerializeToJson):
 
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
+
+        # TODO create objectValues on DX
         result['member'] = [
             getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
-            for member in self.context.objectValues()
+            for ident, member in self.context.items()
+            if not ident.startswith('_')
         ]
         return result
 
