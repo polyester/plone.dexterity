@@ -15,6 +15,7 @@
     <include package="zope.dublincore" />
 
     <include package=".serialize" />
+    <include package=".deserialize" />
 
     <permission
       id="plone.ModifyPortalContent"
