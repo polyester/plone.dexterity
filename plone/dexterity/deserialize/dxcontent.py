@@ -3,6 +3,7 @@ from plone.supermodel.interfaces import WRITE_PERMISSIONS_KEY
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.utils import iterSchemata
 from plone.jsonserializer.interfaces import IDeserializeFromJson
+from plone.jsonserializer.exceptions import DeserializationError
 from plone.jsonserializer.interfaces import IFieldDeserializer
 from plone.supermodel.utils import mergedTaggedValueDict
 from zope.component import adapter
@@ -13,6 +14,7 @@ from zope.interface import Interface
 from zope.interface import implementer
 from zope.lifecycleevent import ObjectModifiedEvent
 from zope.schema import getFields
+from zope.schema import getValidationErrors
 from zope.schema.interfaces import ValidationError
 from zope.security.interfaces import IPermission
 from zope.security import checkPermission
@@ -30,7 +32,6 @@ class DeserializeFromJson(object):
     def __call__(self, data, validate_all=False):
 
         modified = False
-        schema_data = {}
         errors = []
 
         for schema in iterSchemata(self.context):
@@ -39,16 +40,10 @@ class DeserializeFromJson(object):
 
             for name, field in getFields(schema).items():
 
-                field_data = schema_data.setdefault(schema, {})
-
                 if field.readonly:
                     continue
 
                 if name in data:
-
-                    # dm = queryMultiAdapter((self.context, field), IDataManager)
-                    # if not dm.canWrite():
-                    #     continue
 
                     if not self.check_permission(write_permissions.get(name)):
                         continue
@@ -69,30 +64,27 @@ class DeserializeFromJson(object):
                         errors.append({
                             'message': e.doc(), 'field': name, 'error': e})
                     else:
-                        field_data[name] = value
-                        if value != dm.get():
-                            dm.set(value)
-                            modified = True
+                        f = schema.get(name)
+                        try:
+                            f.validate(value)
+                        except ValidationError as e:
+                            errors.append({
+                                'message': e.doc(), 'field': name, 'error': e})
+                        else:
+                            setattr(schema(self.context), name, value)
 
-                # elif validate_all:
-                #     dm = queryMultiAdapter((self.context, field), IDataManager)
-                #     bound = field.bind(self.context)
-                #     try:
-                #         bound.validate(dm.get())
-                #     except ValidationError as e:
-                #         errors.append({
-                #             'message': e.doc(), 'field': name, 'error': e})
+            if validate_all:
+                validation = getValidationErrors(schema, schema(self.context))
 
-        # # Validate schemata
-        # for schema, field_data in schema_data.items():
-        #     validator = queryMultiAdapter(
-        #         (self.context, self.request, None, schema, None),
-        #         IManagerValidator)
-        #     for error in validator.validate(field_data):
-        #         errors.append({'error': error, 'message': error.message})
-
-        # if errors:
-        #     raise BadRequest(errors)
+                if len(validation):
+                    for e in validation:
+                        errors.append({
+                            'message': e[1].doc(),
+                            'field': e[0],
+                            'error': e
+                            })
+        if errors:
+            raise DeserializationError(errors)
 
         if modified:
             notify(ObjectModifiedEvent(self.context))
