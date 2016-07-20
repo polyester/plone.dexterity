@@ -100,12 +100,12 @@ class DexterityFTI(Persistent):
 
     )
 
-    default_aliases = {
-        '(Default)': '(dynamic view)',
-        'view': '(selected layout)',
-        'edit': '@@edit',
-        'sharing': '@@sharing',
-    }
+    # default_aliases = {
+    #     '(Default)': '(dynamic view)',
+    #     'view': '(selected layout)',
+    #     'edit': '@@edit',
+    #     'sharing': '@@sharing',
+    # }
 
     default_actions = [
         {
@@ -122,10 +122,10 @@ class DexterityFTI(Persistent):
         },
     ]
 
-    immediate_view = 'view'
-    default_view = 'view'
-    view_methods = ('view',)
-    add_permission = 'cmf.AddPortalContent'
+    # immediate_view = 'view'
+    # default_view = 'view'
+    # view_methods = ('view',)
+    add_permission = 'plone.AddContent'
     behaviors = []
     klass = 'plone.dexterity.content.Item'
     model_source = '''\
@@ -310,7 +310,7 @@ class DexterityFTI(Persistent):
     # Allow us to specify a particular add permission rather than rely on ones
     # stored in meta types that we don't have anyway
 
-    def isConstructionAllowed(self, container):
+    def isConstructionAllowed(self, container, request=None):
         if not self.add_permission:
             return False
 
@@ -318,10 +318,13 @@ class DexterityFTI(Persistent):
         if permission is None:
             return False
 
-        return bool(
-            getSecurityPolicy()().checkPermission(  # noqa
-                permission.title, container)
-        )
+        if request:
+            return request.security.checkPermission(permission.id, container)
+        else:
+            return bool(
+                getSecurityPolicy()().checkPermission(  # noqa
+                    permission.title, container)
+            )
 
     #
     # Helper methods
