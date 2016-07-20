@@ -104,7 +104,7 @@ def getAdditionalSchemata(context=None, portal_type=None):
 
 def createContent(portal_type, **kw):
     fti = getUtility(IDexterityFTI, name=portal_type)
-    content = createObject(fti.factory)
+    content = createObject(fti.factory, **kw)
 
     # Note: The factory may have done this already, but we want to be sure
     # that the created type has the right portal type. It is possible
@@ -138,7 +138,7 @@ def createContent(portal_type, **kw):
     return content
 
 
-def addContentToContainer(container, object, checkConstraints=True):
+def addContentToContainer(container, object, request=None, checkConstraints=True):
     """Add an object to a container.
 
     The portal_type must already be set correctly. If checkConstraints
@@ -151,35 +151,38 @@ def addContentToContainer(container, object, checkConstraints=True):
         raise ValueError('object must have its portal_type set')
 
     if checkConstraints:
-        container_fti = container.getTypeInfo()
+        # TODO: Right now we don't have option to allow custom container restrictions
+        # container_fti = container.getTypeInfo()
 
         fti = getUtility(IDexterityFTI, name=object.portal_type)
-        if not fti.isConstructionAllowed(container):
+        if not fti.isConstructionAllowed(container, request):
             raise Unauthorized(
                 'Cannot create {0:s}'.format(object.portal_type))
 
-        if container_fti is not None \
-           and not container_fti.allowType(object.portal_type):
-            raise ValueError(
-                'Disallowed subobject type: {0:s}'.format(
-                    object.portal_type)
-            )
+        # TODO 
+        # if container_fti is not None \
+        #    and not container_fti.allowType(object.portal_type):
+        #     raise ValueError(
+        #         'Disallowed subobject type: {0:s}'.format(
+        #             object.portal_type)
+        #     )
 
     name = getattr(object, 'id', None)
     name = INameChooser(container).chooseName(name, object)
     object.id = name
 
-    newName = container._setObject(name, object)
-    return container._getOb(newName)
+    container[name] = object
+    return container[name]
 
 
 def createContentInContainer(container, portal_type, checkConstraints=True,
-                             **kw):
+                             request=None, **kw):
     content = createContent(portal_type, **kw)
     return addContentToContainer(
         container,
         content,
-        checkConstraints=checkConstraints
+        checkConstraints=checkConstraints,
+        request=request
     )
 
 
