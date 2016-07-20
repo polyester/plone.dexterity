@@ -57,8 +57,8 @@ class SerializeToJson(object):
             '@id': '/'.join(get_physical_path(self.context)),
             '@type': self.context.portal_type,
             'parent': parent_summary,
-            'created': json_compatible(self.context.created),
-            'modified': json_compatible(self.context.modified),
+            'created': json_compatible(self.context.creation_date),
+            'modified': json_compatible(self.context.modification_date),
             'UID': self.context.UID(),
             'schema': schema_summary
         }
@@ -71,7 +71,6 @@ class SerializeToJson(object):
 
                 if not self.check_permission(read_permissions.get(name)):
                     continue
-
                 serializer = queryMultiAdapter(
                     (field, self.context, self.request),
                     IFieldSerializer)
