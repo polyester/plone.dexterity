@@ -49,18 +49,13 @@ class SerializeToJson(object):
         else:
             parent_summary = {}
 
-        fti = queryUtility(IDexterityFTI, name=self.context.portal_type)
-        schema_summary = getMultiAdapter((fti, self.request), ISerializeToJson)()
-
         result = {
-            # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
             '@id': '/'.join(get_physical_path(self.context)),
             '@type': self.context.portal_type,
             'parent': parent_summary,
             'created': json_compatible(self.context.creation_date),
             'modified': json_compatible(self.context.modification_date),
             'UID': self.context.UID(),
-            'schema': schema_summary
         }
 
         for schema in iterSchemata(self.context):
