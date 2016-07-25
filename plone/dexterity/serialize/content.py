@@ -98,7 +98,7 @@ class SerializeFolderToJson(SerializeToJson):
         result = super(SerializeFolderToJson, self).__call__()
 
         # TODO create objectValues on DX
-        result['member'] = [
+        result['items'] = [
             getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
             for ident, member in self.context.items()
             if not ident.startswith('_')
