@@ -51,6 +51,7 @@ class SerializeToJson(object):
 
         result = {
             '@id': '/'.join(get_physical_path(self.context)),
+            'id': self.context.id,
             '@type': self.context.portal_type,
             'parent': parent_summary,
             'created': json_compatible(self.context.creation_date),
@@ -97,12 +98,13 @@ class SerializeFolderToJson(SerializeToJson):
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
 
-        # TODO create objectValues on DX
+        # TODO: Check on catalog
         result['items'] = [
             getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
             for ident, member in self.context.items()
             if not ident.startswith('_')
         ]
+
         return result
 
 
@@ -149,7 +151,6 @@ class SerializeFTIToJson(SerializeToJson):
                 field = schema[fieldName]
                 serializer = getMultiAdapter((field, schema, fti, self.request), IFieldSerializer)
                 result['properties'][fieldName] = serializer()
-
 
             invariants = []
             for i in schema.queryTaggedValue('invariants', []):
