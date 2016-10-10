@@ -98,11 +98,13 @@ class SerializeFolderToJson(SerializeToJson):
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
 
-        # TODO: Check on catalog
+        security = IInteraction(self.request)
+
         result['items'] = [
             getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
             for ident, member in self.context.items()
-            if not ident.startswith('_')
+            if not ident.startswith('_') and
+            bool(security.checkPermission('plone.AccessContent', self.context))
         ]
 
         return result
