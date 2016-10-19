@@ -120,9 +120,11 @@ class SerializeFTIToJson(SerializeToJson):
             # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
             'title': fti.id,
             'type': 'object',
+            '$schema': 'http://json-schema.org/draft-04/hyper-schema#',
+            'fieldsets': [],
+            'required': [],
+            'schemas': {},
             'properties': {
-                'fieldsets': {},
-                'schemas': {}
             },
         }
 
@@ -130,7 +132,7 @@ class SerializeFTIToJson(SerializeToJson):
 
             schema_serializer = getMultiAdapter(
                 (schema, fti, self.request), ISchemaSerializer)
-            result['properties']['schemas'][schema_serializer.name] = schema_serializer()
+            result['schemas'][schema_serializer.name] = schema_serializer()
 
             fieldsets = schema.queryTaggedValue(FIELDSETS_KEY, [])
             fieldset_fields = set()
@@ -143,7 +145,11 @@ class SerializeFTIToJson(SerializeToJson):
                 # Write the fieldset and any fields it contains
                 fieldset_serializer = getMultiAdapter(
                     (fieldset, schema, fti, self.request), IFieldsetSerializer)
-                result['properties']['fieldsets'][fieldset_serializer.name] = fieldset_serializer()
+                result['fieldsets'].append({
+                    'id': fieldset_serializer.name,
+                    'title': fieldset_serializer.name,
+                    'fields': fieldset_serializer()
+                })
 
             # Handle any fields that aren't part of a fieldset
             non_fieldset_fields = [name for name, field in sortedFields(schema)
@@ -151,14 +157,19 @@ class SerializeFTIToJson(SerializeToJson):
 
             for fieldName in non_fieldset_fields:
                 field = schema[fieldName]
-                serializer = getMultiAdapter((field, schema, fti, self.request), IFieldSerializer)
+                if field.required:
+                    result['required'].append(fieldName)
+                serializer = getMultiAdapter(
+                    (field, schema, fti, self.request), IFieldSerializer)
                 result['properties'][fieldName] = serializer()
 
             invariants = []
             for i in schema.queryTaggedValue('invariants', []):
                 invariants.append("%s.%s" % (i.__module__, i.__name__))
-            result['properties']['invariants'] = invariants
+            result['invariants'] = invariants
 
+        if len(result['fieldsets']) == 0:
+            del result['fieldsets']
         return result
 
 

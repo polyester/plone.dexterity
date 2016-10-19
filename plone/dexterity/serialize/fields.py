@@ -31,6 +31,15 @@ from zope.schema.interfaces import IField
 from zope.schema.interfaces import IFromUnicode
 from zope.schema.interfaces import ITime
 from zope.schema.interfaces import ITimedelta
+from zope.schema.interfaces import ITextLine
+from zope.schema.interfaces import IObject
+from zope.schema.interfaces import IChoice
+from zope.schema.interfaces import IBool
+from zope.schema.interfaces import IInt
+from zope.schema.interfaces import IFloat
+from zope.schema.interfaces import IDate
+from zope.schema.interfaces import IText
+from plone.server.interfaces import IRichText
 import zope.schema
 
 
@@ -221,4 +230,94 @@ class DefaultFTIFieldSerializer(object):
     def field_type(self):
         name_extractor = IFieldNameExtractor(self.field)
         return name_extractor()
+
+
+@adapter(IText, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTITextSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'string'
+
+
+@adapter(ITextLine, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTITextLineSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'string'
+
+
+@adapter(IFloat, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIFloatSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'number'
+
+
+@adapter(IInt, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIIntegerSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'integer'
+
+
+@adapter(IBool, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIBooleanSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'boolean'
+
+
+@adapter(ICollection, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTICollectionSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'array'
+
+
+@adapter(IChoice, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIChoiceSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'string'
+
+
+@adapter(IObject, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIObjectSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'object'
+
+
+@adapter(IRichText, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIRichTextSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'string'
+
+
+@adapter(IDate, ISchema, IDexterityFTI, Interface)
+@implementer(IFieldSerializer)
+class FTIDateSerializer(DefaultFTIFieldSerializer):
+
+    @property
+    def field_type(self):
+        return 'string'
 
