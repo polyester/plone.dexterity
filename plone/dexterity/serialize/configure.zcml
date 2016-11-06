@@ -9,6 +9,8 @@
     <include package="plone.jsonserializer" />
     <adapter factory=".content.SerializeToJson" />
     <adapter factory=".content.SerializeFolderToJson" />
+    <adapter factory=".content.SerializeBigFolderToJson" />
+    
     <adapter factory=".content.SerializeFTIToJson" />
 
     <adapter factory=".fields.DefaultSchemaSerializer" />
@@ -16,6 +18,17 @@
 
     <adapter factory=".fields.DefaultFieldSerializer" />
     <adapter factory=".fields.DefaultFTIFieldSerializer" />
+    <adapter factory=".fields.FTITextLineSerializer" />
+    <adapter factory=".fields.FTIFloatSerializer" />
+    <adapter factory=".fields.FTIIntegerSerializer" />
+    <adapter factory=".fields.FTIBooleanSerializer" />
+    <adapter factory=".fields.FTICollectionSerializer" />
+    <adapter factory=".fields.FTIChoiceSerializer" />
+    <adapter factory=".fields.FTIObjectSerializer" />
+    <adapter factory=".fields.FTIRichTextSerializer" />
+    <adapter factory=".fields.FTIDateSerializer" />
+    <adapter factory=".fields.FTITextSerializer" />
+
 
 <!-- TODO:  <adapter factory=".content.DeserializeFromJson" />
   <adapter factory=".fields.DefaultFieldDeserializer" />

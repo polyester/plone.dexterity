@@ -10,6 +10,7 @@ from plone.jsonserializer.interfaces import IFieldsetSerializer
 from plone.jsonserializer.interfaces import ISchemaSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
 from plone.jsonserializer.interfaces import ISerializeToJsonSummary
+from plone.dexterity.interfaces import IDexterityBigContainer
 from plone.jsonserializer.serializer.converters import json_compatible
 from plone.server.browser import get_physical_path
 from plone.supermodel.interfaces import FIELDSETS_KEY
@@ -26,6 +27,8 @@ from zope.interface import Interface
 from zope.schema import getFields
 from zope.security.interfaces import IInteraction
 from zope.security.interfaces import IPermission
+
+MAX_ALLOWED = 200
 
 
 @implementer(ISerializeToJson)
@@ -49,18 +52,14 @@ class SerializeToJson(object):
         else:
             parent_summary = {}
 
-        fti = queryUtility(IDexterityFTI, name=self.context.portal_type)
-        schema_summary = getMultiAdapter((fti, self.request), ISerializeToJson)()
-
         result = {
-            # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
             '@id': '/'.join(get_physical_path(self.context)),
+            'id': self.context.id,
             '@type': self.context.portal_type,
             'parent': parent_summary,
-            'created': json_compatible(self.context.created),
-            'modified': json_compatible(self.context.modified),
+            'created': json_compatible(self.context.creation_date),
+            'modified': json_compatible(self.context.modification_date),
             'UID': self.context.UID(),
-            'schema': schema_summary
         }
 
         for schema in iterSchemata(self.context):
@@ -71,7 +70,6 @@ class SerializeToJson(object):
 
                 if not self.check_permission(read_permissions.get(name)):
                     continue
-
                 serializer = queryMultiAdapter(
                     (field, self.context, self.request),
                     IFieldSerializer)
@@ -103,12 +101,45 @@ class SerializeFolderToJson(SerializeToJson):
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
 
-        # TODO create objectValues on DX
-        result['member'] = [
-            getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
-            for ident, member in self.context.items()
-            if not ident.startswith('_')
-        ]
+        security = IInteraction(self.request)
+        length = len(self.context)
+
+        if length > MAX_ALLOWED:
+            result['items'] = []
+        else:
+            result['items'] = [
+                getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
+                for ident, member in self.context.items()
+                if not ident.startswith('_') and
+                bool(security.checkPermission('plone.AccessContent', self.context))
+            ]
+        result['length'] = length
+
+        return result
+
+
+@implementer(ISerializeToJson)
+@adapter(IDexterityBigContainer, Interface)
+class SerializeBigFolderToJson(SerializeToJson):
+
+    def __call__(self):
+        result = super(SerializeFolderToJson, self).__call__()
+
+        security = IInteraction(self.request)
+
+        length = len(self.context)
+
+        if length > MAX_ALLOWED:
+            result['items'] = []
+        else:
+            result['items'] = [
+                getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
+                for ident, member in self.context.items()
+                if not ident.startswith('_') and
+                bool(security.checkPermission('plone.AccessContent', self.context))
+            ]
+        result['length'] = length
+
         return result
 
 
@@ -122,9 +153,11 @@ class SerializeFTIToJson(SerializeToJson):
             # '@context': 'http://www.w3.org/ns/hydra/context.jsonld',
             'title': fti.id,
             'type': 'object',
+            '$schema': 'http://json-schema.org/draft-04/hyper-schema#',
+            'fieldsets': [],
+            'required': [],
+            'schemas': {},
             'properties': {
-                'fieldsets': {},
-                'schemas': {}
             },
         }
 
@@ -132,7 +165,7 @@ class SerializeFTIToJson(SerializeToJson):
 
             schema_serializer = getMultiAdapter(
                 (schema, fti, self.request), ISchemaSerializer)
-            result['properties']['schemas'][schema_serializer.name] = schema_serializer()
+            result['schemas'][schema_serializer.name] = schema_serializer()
 
             fieldsets = schema.queryTaggedValue(FIELDSETS_KEY, [])
             fieldset_fields = set()
@@ -145,7 +178,11 @@ class SerializeFTIToJson(SerializeToJson):
                 # Write the fieldset and any fields it contains
                 fieldset_serializer = getMultiAdapter(
                     (fieldset, schema, fti, self.request), IFieldsetSerializer)
-                result['properties']['fieldsets'][fieldset_serializer.name] = fieldset_serializer()
+                result['fieldsets'].append({
+                    'id': fieldset_serializer.name,
+                    'title': fieldset_serializer.name,
+                    'fields': fieldset_serializer()
+                })
 
             # Handle any fields that aren't part of a fieldset
             non_fieldset_fields = [name for name, field in sortedFields(schema)
@@ -153,15 +190,19 @@ class SerializeFTIToJson(SerializeToJson):
 
             for fieldName in non_fieldset_fields:
                 field = schema[fieldName]
-                serializer = getMultiAdapter((field, schema, fti, self.request), IFieldSerializer)
+                if field.required:
+                    result['required'].append(fieldName)
+                serializer = getMultiAdapter(
+                    (field, schema, fti, self.request), IFieldSerializer)
                 result['properties'][fieldName] = serializer()
-
 
             invariants = []
             for i in schema.queryTaggedValue('invariants', []):
                 invariants.append("%s.%s" % (i.__module__, i.__name__))
-            result['properties']['invariants'] = invariants
+            result['invariants'] = invariants
 
+        if len(result['fieldsets']) == 0:
+            del result['fieldsets']
         return result
 
 

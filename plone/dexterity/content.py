@@ -2,36 +2,36 @@
 from copy import deepcopy
 from datetime import datetime
 from persistent import Persistent
+
 from dateutil.tz import tzlocal
-from dateutil.tz import tzutc
 from plone.behavior.interfaces import IBehaviorAssignable
 from zope.annotation import IAttributeAnnotatable
 from zope.container.contained import Contained
-from zope.container.ordered import OrderedContainer
-from zope.dublincore.interfaces import IWriteZopeDublinCore
 from zope.interface import implementer
 from zope.interface.declarations import Implements
 from zope.interface.declarations import ObjectSpecificationDescriptor
 from zope.interface.declarations import getObjectSpecification
 from zope.interface.declarations import implementedBy
 from zope.schema.interfaces import IContextAwareDefaultFactory
-from zope.traversing.browser.interfaces import IAbsoluteURL
 from plone.dexterity.interfaces import IDexterityContainer
 from plone.dexterity.interfaces import IDexterityContent
 from plone.dexterity.interfaces import IDexterityItem
 from plone.dexterity.schema import SCHEMA_CACHE
-from plone.dexterity.utils import safe_str
 from plone.uuid.interfaces import IAttributeUUID
 from plone.uuid.interfaces import IUUID
+import asyncio
+import six
+from zope.event import notify
+from BTrees.OOBTree import OOBTree
+from BTrees.Length import Length
+from zope.container.contained import setitem, uncontained
+from zope.container.contained import notifyContainerModified
+from zope.container.contained import containedEvent
+from persistent.dict import PersistentDict
+from persistent.list import PersistentList
 
 _marker = object()
 _zone = tzlocal()
-_utc = tzutc()
-
-# always effective
-FLOOR_DATE = datetime(*datetime.min.timetuple()[:-2], tzutc())
-# never expires
-CEILING_DATE = datetime(*datetime.max.timetuple()[:-2], tzutc())
 
 
 def _default_from_schema(context, schema, fieldname):
@@ -135,8 +135,7 @@ class FTIAwareSpecification(ObjectSpecificationDescriptor):
 @implementer(
     IDexterityContent,
     IAttributeAnnotatable,
-    IAttributeUUID,
-    IWriteZopeDublinCore,
+    IAttributeUUID
 )
 class DexterityContent(Persistent, Contained):
     """Base class for Dexterity content
@@ -147,48 +146,16 @@ class DexterityContent(Persistent, Contained):
     # portal_type is set by the add view and/or factory
     portal_type = None
 
-    title = u''
-    description = u''
-    subject = ()
-    creators = ()
-    contributors = ()
-    effective_date = None
-    expiration_date = None
-    format = 'text/html'
-    language = ''
-    rights = ''
-
     def __init__(  # noqa
             self,
-            id=None, title=_marker, subject=_marker, description=_marker,
-            contributors=_marker, effective_date=_marker,
-            expiration_date=_marker, format=_marker, language=_marker,
-            rights=_marker, **kwargs):
+            id=None,
+            **kwargs):
 
         if id is not None:
             self.id = id
         now = datetime.now(tz=_zone)
         self.creation_date = now
         self.modification_date = now
-
-        if title is not _marker:
-            self.setTitle(title)
-        if subject is not _marker:
-            self.setSubject(subject)
-        if description is not _marker:
-            self.setDescription(description)
-        if contributors is not _marker:
-            self.setContributors(contributors)
-        if effective_date is not _marker:
-            self.setEffectiveDate(effective_date)
-        if expiration_date is not _marker:
-            self.setExpirationDate(expiration_date)
-        if format is not _marker:
-            self.setFormat(format)
-        if language is not _marker:
-            self.setLanguage(language)
-        if rights is not _marker:
-            self.setRights(rights)
 
         for (k, v) in kwargs.items():
             setattr(self, k, v)
@@ -248,237 +215,27 @@ class DexterityContent(Persistent, Contained):
         """Returns the item's globally unique id."""
         return IUUID(self)
 
-    def notifyModified(self):
-        """Update creators and modification_date.
 
-        This is called from CMFCatalogAware.reindexObject.
-        """
-        self.addCreator()
-        self.setModificationDate()
 
-    def addCreator(self, creator=None):
-        """ Add creator to Dublin Core creators.
-        """
-        if len(self.creators) > 0:
-            # do not add creator if one is already set
-            return
+def synccontext(context):
+    """Return connections asyncio executor instance (from context) to be used
+    together with "await" syntax to queue or commit to be executed in
+    series in a dedicated thread.
 
-        if creator is None:
-            return
+    :param request: current request
 
-        # call self.listCreators() to make sure self.creators exists
-        if creator and creator not in self.listCreators():
-            self.creators = self.creators + (creator, )
+    Example::
 
-    def setModificationDate(self, modification_date=None):
-        """ Set the date when the resource was last modified.
+        await sync(request)(txn.commit)
 
-        When called without an argument, sets the date to now.
-        """
-        if modification_date is None:
-            self.modification_date = datetime.now(tz=_zone)
-        else:
-            self.modification_date = modification_date
-
-    # IMinimalDublinCore
-
-    def Title(self):
-        return self.title or ''
-
-    def Description(self):
-        return self.description or ''
-
-    def Type(self):
-        ti = self.getTypeInfo()
-        return ti is not None and ti.Title() or 'Unknown'
-
-    # IDublinCore
-
-    def listCreators(self):
-        # List Dublin Core Creator elements - resource authors.
-        if self.creators is None:
-            return ()
-        return self.creators
-
-    def Creator(self):
-        # Dublin Core Creator element - resource author.
-        creators = self.listCreators()
-        return creators and creators[0] or ''
-
-    def Subject(self):
-        # Dublin Core Subject element - resource keywords.
-        if self.subject is None:
-            return ()
-        return self.subject
-
-    def Publisher(self):
-        # Dublin Core Publisher element - resource publisher.
-        return 'No publisher'
-
-    def listContributors(self):
-        # Dublin Core Contributor elements - resource collaborators.
-        return self.contributors
-
-    def Contributors(self):
-        # Deprecated alias of listContributors.
-        return self.listContributors()
-
-    def Date(self, zone=None):
-        # Dublin Core Date element - default date.
-        if zone is None:
-            zone = _zone
-        # Return effective_date if set, modification date otherwise
-        date = getattr(self, 'effective_date', None)
-        if date is None:
-            date = self.modified()
-        try:
-            return date.astimezone(zone).isoformat()
-        except (TypeError, ValueError):
-            return date.isoformat()
-
-    def CreationDate(self, zone=None):
-        # Dublin Core Date element - date resource created.
-        if zone is None:
-            zone = _zone
-        # return unknown if never set properly
-        if self.creation_date:
-            try:
-                return self.creation_date.astimezone(zone).isoformat()
-            except (TypeError, ValueError):
-                return self.creation_date.isoformat()
-        else:
-            return 'Unknown'
-
-    def EffectiveDate(self, zone=None):
-        # Dublin Core Date element - date resource becomes effective.
-        if zone is None:
-            zone = _zone
-        if getattr(self, 'effective_date', None):
-            try:
-                return self.effective_date.astimezone(zone).isoformat()
-            except (TypeError, ValueError):
-                return self.effective_date.isoformat()
-        else:
-            return None
-
-    def ExpirationDate(self, zone=None):
-        # Dublin Core Date element - date resource expires.
-        if zone is None:
-            zone = _zone
-        if getattr(self, 'expiration_date', None):
-            try:
-                return self.expiration_date.astimezone(zone).isoformat()
-            except (TypeError, ValueError):
-                return self.expiration_date.isoformat()
-        else:
-            return None
-
-    def ModificationDate(self, zone=None):
-        # Dublin Core Date element - date resource last modified.
-        if zone is None:
-            zone = _zone
-        try:
-            return self.modified().astimezone(zone).isoformat()
-        except (TypeError, ValueError):
-            return self.modified().isoformat()
-
-    def Identifier(self):
-        # Dublin Core Identifier element - resource ID.
-        return str(IAbsoluteURL(self, IUUID(self)))
-
-    def Language(self):
-        # Dublin Core Language element - resource language.
-        return self.language
-
-    def Rights(self):
-        # Dublin Core Rights element - resource copyright.
-        return self.rights
-
-    # ICatalogableDublinCore
-
-    def created(self):
-        # Dublin Core Date element - date resource created.
-        # allow for non-existent creation_date, existed always
-        date = getattr(self, 'creation_date', None)
-        return date is None and FLOOR_DATE or date
-
-    def effective(self):
-        # Dublin Core Date element - date resource becomes effective.
-        date = getattr(self, 'effective_date', _marker)
-        if date is _marker:
-            date = getattr(self, 'creation_date', None)
-        return date is None and FLOOR_DATE or date
-
-    def expires(self):
-        # Dublin Core Date element - date resource expires.
-        date = getattr(self, 'expiration_date', None)
-        return date is None and CEILING_DATE or date
-
-    def modified(self):
-        # Dublin Core Date element - date resource last modified.
-        date = self.modification_date
-        if date is None:
-            # Upgrade.
-            date = datetime.fromtimestamp(self._p_mtime, tz=_zone)
-            self.modification_date = date
-        return date
-
-    def isEffective(self, date):
-        # Is the date within the resource's effective range?
-        pastEffective = (
-            self.effective_date is None or self.effective_date <= date)
-        beforeExpiration = (
-            self.expiration_date is None or self.expiration_date >= date)
-        return pastEffective and beforeExpiration
-
-    # IMutableDublinCore
-
-    def setTitle(self, title):
-        # Set Dublin Core Title element - resource name.
-        self.title = safe_str(title)
-
-    def setDescription(self, description):
-        # Set Dublin Core Description element - resource summary.
-        self.description = safe_str(description)
-
-    def setCreators(self, creators):
-        # Set Dublin Core Creator elements - resource authors.
-        if isinstance(creators, str):
-            creators = [creators]
-        self.creators = tuple(safe_str(c.strip()) for c in creators)
-
-    def setSubject(self, subject):
-        # Set Dublin Core Subject element - resource keywords.
-        if isinstance(subject, str):
-            subject = [subject]
-        self.subject = tuple(safe_str(s.strip()) for s in subject)
-
-    def setContributors(self, contributors):
-        # Set Dublin Core Contributor elements - resource collaborators.
-        if isinstance(contributors, str):
-            contributors = contributors.split(';')
-        self.contributors = tuple(
-                safe_str(c.strip()) for c in contributors)
-
-    def setEffectiveDate(self, effective_date):
-        # Set Dublin Core Date element - date resource becomes effective.
-        self.effective_date = effective_date
-
-    def setExpirationDate(self, expiration_date):
-        # Set Dublin Core Date element - date resource expires.
-        self.expiration_date = expiration_date
-
-    def setFormat(self, format):
-        # Set Dublin Core Format element - resource format.
-        self.format = format
-
-    def setLanguage(self, language):
-        # Set Dublin Core Language element - resource language.
-        self.language = language
-
-    def setRights(self, rights):
-        # Set Dublin Core Rights element - resource copyright.
-        self.rights = safe_str(rights)
+    """
+    loop = asyncio.get_event_loop()
+    assert getattr(context, '_p_jar', None) is not None, \
+        'Request has no conn'
+    assert getattr(context._p_jar, 'executor', None) is not None, \
+        'Connection has no executor'
+    return lambda *args, **kwargs: loop.run_in_executor(
+        context._p_jar.executor, *args, **kwargs)
 
 
 @implementer(IDexterityItem)
@@ -492,28 +249,263 @@ class Item(DexterityContent):
     __getattr__ = DexterityContent.__getattr__
 
 
-@implementer(IDexterityContainer)
-class Container(OrderedContainer, DexterityContent):
+@implementer(
+    IDexterityContainer,
+    IAttributeAnnotatable,
+    IAttributeUUID)
+class Container(DexterityContent):
     """Base class for folderish items
     """
 
     __providedBy__ = FTIAwareSpecification()
 
-    # Make sure PortalFolder's accessors and mutators don't take precedence
-    Title = DexterityContent.Title
-    setTitle = DexterityContent.setTitle
-    Description = DexterityContent.Description
-    setDescription = DexterityContent.setDescription
-
     def __init__(self, id=None, **kwargs):
-        OrderedContainer.__init__(self)
+        self._data = PersistentDict()
+        self._order = PersistentList()
         DexterityContent.__init__(self, id, **kwargs)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name, default=None):
+        return DexterityContent.__getattr__(self, name)
+
+    def keys(self):
+        return self._order[:]
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    async def asyncget(self, key):
+        return await synccontext(self)(self._data.__getitem__, key)
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def values(self):
+        return [self._data[i] for i in self._order]
+
+    def __len__(self):
+        return len(self._data)
+
+    def items(self):
+        return [(i, self._data[i]) for i in self._order]
+
+    def __contains__(self, key):
+        return key in self._data
+
+    has_key = __contains__
+
+    def __setitem__(self, key, object):
+        existed = key in self._data
+
+        bad = False
+        if not isinstance(key, six.string_types):
+            bad = True
+        if bad:
+            raise TypeError("'%s' is invalid, the key must be an "
+                            "ascii or unicode string" % key)
+        if len(key) == 0:
+            raise ValueError("The key cannot be an empty string")
+
+        # We have to first update the order, so that the item is available,
+        # otherwise most API functions will lie about their available values
+        # when an event subscriber tries to do something with the container.
+        if not existed:
+            self._order.append(key)
+
+        # This function creates a lot of events that other code listens to.
         try:
-            return DexterityContent.__getattr__(self, name)
-        except AttributeError:
-            value = OrderedContainer.get(self, name, _marker)
-            if value is _marker:
-                raise
-            return value
+            setitem(self, self._data.__setitem__, key, object)
+        except Exception:
+            if not existed:
+                self._order.remove(key)
+            raise
+
+        return key
+
+    def __delitem__(self, key):
+        uncontained(self._data[key], self, key)
+        del self._data[key]
+        self._order.remove(key)
+
+    def updateOrder(self, order):
+        """ See `IOrderedContainer`.
+
+        >>> oc = OrderedContainer()
+        >>> oc['foo'] = 'bar'
+        >>> oc['baz'] = 'quux'
+        >>> oc['zork'] = 'grue'
+        >>> oc.keys()
+        ['foo', 'baz', 'zork']
+        >>> oc.updateOrder(['baz', 'foo', 'zork'])
+        >>> oc.keys()
+        ['baz', 'foo', 'zork']
+        >>> oc.updateOrder(['baz', 'zork', 'foo'])
+        >>> oc.keys()
+        ['baz', 'zork', 'foo']
+        >>> oc.updateOrder(['baz', 'zork', 'foo'])
+        >>> oc.keys()
+        ['baz', 'zork', 'foo']
+        >>> oc.updateOrder(('zork', 'foo', 'baz'))
+        >>> oc.keys()
+        ['zork', 'foo', 'baz']
+        >>> oc.updateOrder(['baz', 'zork'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> oc.updateOrder(['foo', 'bar', 'baz', 'quux'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> oc.updateOrder(1)
+        Traceback (most recent call last):
+        ...
+        TypeError: order must be a tuple or a list.
+        >>> oc.updateOrder('bar')
+        Traceback (most recent call last):
+        ...
+        TypeError: order must be a tuple or a list.
+        >>> oc.updateOrder(['baz', 'zork', 'quux'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> del oc['baz']
+        >>> del oc['zork']
+        >>> del oc['foo']
+        >>> len(oc)
+        0
+        """
+
+        if not isinstance(order, list) and \
+            not isinstance(order, tuple):
+            raise TypeError('order must be a tuple or a list.')
+
+        if len(order) != len(self._order):
+            raise ValueError("Incompatible key set.")
+
+        was_dict = {}
+        will_be_dict = {}
+        new_order = PersistentList()
+
+        for i in range(len(order)):
+            was_dict[self._order[i]] = 1
+            will_be_dict[order[i]] = 1
+            new_order.append(order[i])
+
+        if will_be_dict != was_dict:
+            raise ValueError("Incompatible key set.")
+
+        self._order = new_order
+        notifyContainerModified(self)
+
+
+class Lazy(object):
+    """Lazy Attributes.
+    """
+
+    def __init__(self, func, name=None):
+        if name is None:
+            name = func.__name__
+        self.data = (func, name)
+
+    def __get__(self, inst, class_):
+        if inst is None:
+            return self
+
+        func, name = self.data
+        value = func(inst)
+        inst.__dict__[name] = value
+
+        return value
+
+
+@implementer(
+    IDexterityContainer,
+    IAttributeAnnotatable,
+    IAttributeUUID)
+class BTreeContainer(DexterityContent):
+
+    def __init__(self, id=None, **kwargs):
+        # We keep the previous attribute to store the data
+        # for backward compatibility
+        self._BTreeContainer__data = self._newContainerData()
+        self.__len = Length()
+        DexterityContent.__init__(self, id, **kwargs)
+
+    def _newContainerData(self):
+        """Construct an item-data container
+
+        Subclasses should override this if they want different data.
+
+        The value returned is a mapping object that also has get,
+        has_key, keys, items, and values methods.
+        The default implementation uses an OOBTree.
+        """
+        return OOBTree()
+
+    def __contains__(self, key):
+        """See interface IReadContainer
+        """
+        return key in self.__data
+
+    @Lazy
+    def _BTreeContainer__len(self):
+        l = Length()
+        ol = len(self.__data)
+        if ol > 0:
+            l.change(ol)
+        self._p_changed = True
+        return l
+
+    def __len__(self):
+        return self.__len()
+
+    def _setitemf(self, key, value):
+        # make sure our lazy property gets set
+        l = self.__len
+        self.__data[key] = value
+        l.change(1)
+
+    def __iter__(self):
+        return iter(self.__data)
+
+    def __getitem__(self, key):
+        '''See interface `IReadContainer`'''
+        return self.__data[key]
+
+    def get(self, key, default=None):
+        '''See interface `IReadContainer`'''
+        return self.__data.get(key, default)
+
+    async def asyncget(self, key):
+        return await synccontext(self)(self.__data.__getitem__, key)
+
+    def __setitem__(self, key, value):
+        if not key:
+            raise ValueError("empty names are not allowed")
+        object, event = containedEvent(value, self, key)
+        self._setitemf(key, value)
+        if event:
+            notify(event)
+            notifyContainerModified(self)
+
+    def __delitem__(self, key):
+        # make sure our lazy property gets set
+        l = self.__len
+        item = self.__data[key]
+        del self.__data[key]
+        l.change(-1)
+        uncontained(item, self, key)
+
+    has_key = __contains__
+
+    def items(self, key=None):
+        return self.__data.items(key)
+
+    def keys(self, key=None):
+        return self.__data.keys(key)
+
+    def values(self, key=None):
+        return self.__data.values(key)
+

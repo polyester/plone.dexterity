@@ -125,4 +125,11 @@
     <!-- PrimaryFieldInfo -->
     <adapter factory=".primary.PrimaryFieldInfo" />
 
+    <!-- NameChooserAdapter -->
+    <adapter
+        provides="zope.container.interfaces.INameChooser"
+        for="plone.dexterity.interfaces.IDexterityContent"
+        factory="zope.container.contained.NameChooser"
+        />
+
 </configure>
