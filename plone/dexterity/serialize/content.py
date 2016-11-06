@@ -10,6 +10,7 @@ from plone.jsonserializer.interfaces import IFieldsetSerializer
 from plone.jsonserializer.interfaces import ISchemaSerializer
 from plone.jsonserializer.interfaces import ISerializeToJson
 from plone.jsonserializer.interfaces import ISerializeToJsonSummary
+from plone.dexterity.interfaces import IDexterityBigContainer
 from plone.jsonserializer.serializer.converters import json_compatible
 from plone.server.browser import get_physical_path
 from plone.supermodel.interfaces import FIELDSETS_KEY
@@ -26,6 +27,8 @@ from zope.interface import Interface
 from zope.schema import getFields
 from zope.security.interfaces import IInteraction
 from zope.security.interfaces import IPermission
+
+MAX_ALLOWED = 200
 
 
 @implementer(ISerializeToJson)
@@ -99,13 +102,43 @@ class SerializeFolderToJson(SerializeToJson):
         result = super(SerializeFolderToJson, self).__call__()
 
         security = IInteraction(self.request)
+        length = len(self.context)
 
-        result['items'] = [
-            getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
-            for ident, member in self.context.items()
-            if not ident.startswith('_') and
-            bool(security.checkPermission('plone.AccessContent', self.context))
-        ]
+        if length > MAX_ALLOWED:
+            result['items'] = []
+        else:
+            result['items'] = [
+                getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
+                for ident, member in self.context.items()
+                if not ident.startswith('_') and
+                bool(security.checkPermission('plone.AccessContent', self.context))
+            ]
+        result['length'] = length
+
+        return result
+
+
+@implementer(ISerializeToJson)
+@adapter(IDexterityBigContainer, Interface)
+class SerializeBigFolderToJson(SerializeToJson):
+
+    def __call__(self):
+        result = super(SerializeFolderToJson, self).__call__()
+
+        security = IInteraction(self.request)
+
+        length = len(self.context)
+
+        if length > MAX_ALLOWED:
+            result['items'] = []
+        else:
+            result['items'] = [
+                getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
+                for ident, member in self.context.items()
+                if not ident.startswith('_') and
+                bool(security.checkPermission('plone.AccessContent', self.context))
+            ]
+        result['length'] = length
 
         return result
 

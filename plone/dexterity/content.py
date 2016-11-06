@@ -7,7 +7,6 @@ from dateutil.tz import tzlocal
 from plone.behavior.interfaces import IBehaviorAssignable
 from zope.annotation import IAttributeAnnotatable
 from zope.container.contained import Contained
-from zope.container.ordered import OrderedContainer
 from zope.interface import implementer
 from zope.interface.declarations import Implements
 from zope.interface.declarations import ObjectSpecificationDescriptor
@@ -20,6 +19,16 @@ from plone.dexterity.interfaces import IDexterityItem
 from plone.dexterity.schema import SCHEMA_CACHE
 from plone.uuid.interfaces import IAttributeUUID
 from plone.uuid.interfaces import IUUID
+import asyncio
+import six
+from zope.event import notify
+from BTrees.OOBTree import OOBTree
+from BTrees.Length import Length
+from zope.container.contained import setitem, uncontained
+from zope.container.contained import notifyContainerModified
+from zope.container.contained import containedEvent
+from persistent.dict import PersistentDict
+from persistent.list import PersistentList
 
 _marker = object()
 _zone = tzlocal()
@@ -208,6 +217,27 @@ class DexterityContent(Persistent, Contained):
 
 
 
+def synccontext(context):
+    """Return connections asyncio executor instance (from context) to be used
+    together with "await" syntax to queue or commit to be executed in
+    series in a dedicated thread.
+
+    :param request: current request
+
+    Example::
+
+        await sync(request)(txn.commit)
+
+    """
+    loop = asyncio.get_event_loop()
+    assert getattr(context, '_p_jar', None) is not None, \
+        'Request has no conn'
+    assert getattr(context._p_jar, 'executor', None) is not None, \
+        'Connection has no executor'
+    return lambda *args, **kwargs: loop.run_in_executor(
+        context._p_jar.executor, *args, **kwargs)
+
+
 @implementer(IDexterityItem)
 class Item(DexterityContent):
     """A non-containerish, CMFish item
@@ -219,22 +249,263 @@ class Item(DexterityContent):
     __getattr__ = DexterityContent.__getattr__
 
 
-@implementer(IDexterityContainer)
-class Container(OrderedContainer, DexterityContent):
+@implementer(
+    IDexterityContainer,
+    IAttributeAnnotatable,
+    IAttributeUUID)
+class Container(DexterityContent):
     """Base class for folderish items
     """
 
     __providedBy__ = FTIAwareSpecification()
 
     def __init__(self, id=None, **kwargs):
-        OrderedContainer.__init__(self)
+        self._data = PersistentDict()
+        self._order = PersistentList()
         DexterityContent.__init__(self, id, **kwargs)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name, default=None):
+        return DexterityContent.__getattr__(self, name)
+
+    def keys(self):
+        return self._order[:]
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    async def asyncget(self, key):
+        return await synccontext(self)(self._data.__getitem__, key)
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def values(self):
+        return [self._data[i] for i in self._order]
+
+    def __len__(self):
+        return len(self._data)
+
+    def items(self):
+        return [(i, self._data[i]) for i in self._order]
+
+    def __contains__(self, key):
+        return key in self._data
+
+    has_key = __contains__
+
+    def __setitem__(self, key, object):
+        existed = key in self._data
+
+        bad = False
+        if not isinstance(key, six.string_types):
+            bad = True
+        if bad:
+            raise TypeError("'%s' is invalid, the key must be an "
+                            "ascii or unicode string" % key)
+        if len(key) == 0:
+            raise ValueError("The key cannot be an empty string")
+
+        # We have to first update the order, so that the item is available,
+        # otherwise most API functions will lie about their available values
+        # when an event subscriber tries to do something with the container.
+        if not existed:
+            self._order.append(key)
+
+        # This function creates a lot of events that other code listens to.
         try:
-            return DexterityContent.__getattr__(self, name)
-        except AttributeError:
-            value = OrderedContainer.get(self, name, _marker)
-            if value is _marker:
-                raise
-            return value
+            setitem(self, self._data.__setitem__, key, object)
+        except Exception:
+            if not existed:
+                self._order.remove(key)
+            raise
+
+        return key
+
+    def __delitem__(self, key):
+        uncontained(self._data[key], self, key)
+        del self._data[key]
+        self._order.remove(key)
+
+    def updateOrder(self, order):
+        """ See `IOrderedContainer`.
+
+        >>> oc = OrderedContainer()
+        >>> oc['foo'] = 'bar'
+        >>> oc['baz'] = 'quux'
+        >>> oc['zork'] = 'grue'
+        >>> oc.keys()
+        ['foo', 'baz', 'zork']
+        >>> oc.updateOrder(['baz', 'foo', 'zork'])
+        >>> oc.keys()
+        ['baz', 'foo', 'zork']
+        >>> oc.updateOrder(['baz', 'zork', 'foo'])
+        >>> oc.keys()
+        ['baz', 'zork', 'foo']
+        >>> oc.updateOrder(['baz', 'zork', 'foo'])
+        >>> oc.keys()
+        ['baz', 'zork', 'foo']
+        >>> oc.updateOrder(('zork', 'foo', 'baz'))
+        >>> oc.keys()
+        ['zork', 'foo', 'baz']
+        >>> oc.updateOrder(['baz', 'zork'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> oc.updateOrder(['foo', 'bar', 'baz', 'quux'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> oc.updateOrder(1)
+        Traceback (most recent call last):
+        ...
+        TypeError: order must be a tuple or a list.
+        >>> oc.updateOrder('bar')
+        Traceback (most recent call last):
+        ...
+        TypeError: order must be a tuple or a list.
+        >>> oc.updateOrder(['baz', 'zork', 'quux'])
+        Traceback (most recent call last):
+        ...
+        ValueError: Incompatible key set.
+        >>> del oc['baz']
+        >>> del oc['zork']
+        >>> del oc['foo']
+        >>> len(oc)
+        0
+        """
+
+        if not isinstance(order, list) and \
+            not isinstance(order, tuple):
+            raise TypeError('order must be a tuple or a list.')
+
+        if len(order) != len(self._order):
+            raise ValueError("Incompatible key set.")
+
+        was_dict = {}
+        will_be_dict = {}
+        new_order = PersistentList()
+
+        for i in range(len(order)):
+            was_dict[self._order[i]] = 1
+            will_be_dict[order[i]] = 1
+            new_order.append(order[i])
+
+        if will_be_dict != was_dict:
+            raise ValueError("Incompatible key set.")
+
+        self._order = new_order
+        notifyContainerModified(self)
+
+
+class Lazy(object):
+    """Lazy Attributes.
+    """
+
+    def __init__(self, func, name=None):
+        if name is None:
+            name = func.__name__
+        self.data = (func, name)
+
+    def __get__(self, inst, class_):
+        if inst is None:
+            return self
+
+        func, name = self.data
+        value = func(inst)
+        inst.__dict__[name] = value
+
+        return value
+
+
+@implementer(
+    IDexterityContainer,
+    IAttributeAnnotatable,
+    IAttributeUUID)
+class BTreeContainer(DexterityContent):
+
+    def __init__(self, id=None, **kwargs):
+        # We keep the previous attribute to store the data
+        # for backward compatibility
+        self._BTreeContainer__data = self._newContainerData()
+        self.__len = Length()
+        DexterityContent.__init__(self, id, **kwargs)
+
+    def _newContainerData(self):
+        """Construct an item-data container
+
+        Subclasses should override this if they want different data.
+
+        The value returned is a mapping object that also has get,
+        has_key, keys, items, and values methods.
+        The default implementation uses an OOBTree.
+        """
+        return OOBTree()
+
+    def __contains__(self, key):
+        """See interface IReadContainer
+        """
+        return key in self.__data
+
+    @Lazy
+    def _BTreeContainer__len(self):
+        l = Length()
+        ol = len(self.__data)
+        if ol > 0:
+            l.change(ol)
+        self._p_changed = True
+        return l
+
+    def __len__(self):
+        return self.__len()
+
+    def _setitemf(self, key, value):
+        # make sure our lazy property gets set
+        l = self.__len
+        self.__data[key] = value
+        l.change(1)
+
+    def __iter__(self):
+        return iter(self.__data)
+
+    def __getitem__(self, key):
+        '''See interface `IReadContainer`'''
+        return self.__data[key]
+
+    def get(self, key, default=None):
+        '''See interface `IReadContainer`'''
+        return self.__data.get(key, default)
+
+    async def asyncget(self, key):
+        return await synccontext(self)(self.__data.__getitem__, key)
+
+    def __setitem__(self, key, value):
+        if not key:
+            raise ValueError("empty names are not allowed")
+        object, event = containedEvent(value, self, key)
+        self._setitemf(key, value)
+        if event:
+            notify(event)
+            notifyContainerModified(self)
+
+    def __delitem__(self, key):
+        # make sure our lazy property gets set
+        l = self.__len
+        item = self.__data[key]
+        del self.__data[key]
+        l.change(-1)
+        uncontained(item, self, key)
+
+    has_key = __contains__
+
+    def items(self, key=None):
+        return self.__data.items(key)
+
+    def keys(self, key=None):
+        return self.__data.keys(key)
+
+    def values(self, key=None):
+        return self.__data.values(key)
+

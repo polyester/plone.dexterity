@@ -187,6 +187,10 @@ class IDexterityContainer(IDexterityContent):
     """Marker interface applied to dexterity-managed folderish objects
     """
 
+class IDexterityBigContainer(IDexterityContainer):
+    """Marker interface applied to dexterity-managed large folderish objects
+    """
+
 
 # Events
 class IBegunEvent(IObjectEvent):

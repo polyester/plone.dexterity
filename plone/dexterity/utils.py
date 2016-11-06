@@ -168,7 +168,9 @@ def addContentToContainer(container, object, request=None, checkConstraints=True
         #     )
 
     name = getattr(object, 'id', None)
-    name = INameChooser(container).chooseName(name, object)
+    if name is None:
+        raise AttributeError()
+    # name = INameChooser(container).chooseName(name, object)
     object.id = name
 
     container[name] = object
